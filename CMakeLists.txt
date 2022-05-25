@@ -82,15 +82,6 @@ target_include_directories(franka_bimanual_controllers PUBLIC
 )
 
 
-add_executable(read_position_bimanual
-  src/read_position_bimanual.cpp
-)
-
-target_link_libraries(read_position_bimanual
-   ${catkin_LIBRARIES}
-   franka_bimanual_controllers
-)
-
 add_executable(bilateral_control
   src/bilateral_control.cpp
 )

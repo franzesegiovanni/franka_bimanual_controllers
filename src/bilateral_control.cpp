@@ -15,7 +15,6 @@
 #include <controller_interface/controller_base.h>
 #include <franka/robot_state.h>
 #include <pluginlib/class_list_macros.h>
-#include "pseudo_inversion.h"
 #include "franka_msgs/FrankaState.h"
 
 

@@ -182,6 +182,10 @@ class BiManualCartesianImpedanceControl
   ros::Subscriber sub_nullspace_left_;
   void equilibriumConfigurationCallback_left(const  sensor_msgs::JointState::ConstPtr&  joint);
   ros::Publisher pub_stiff_update_;
+
+  ros::Publisher pub_right;
+  ros::Publisher pub_left;
+
 };
 
 }  // namespace franka_bimanual_controllers

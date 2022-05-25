@@ -152,6 +152,13 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
         "/equilibrium_distance", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative, this,
         ros::TransportHints().reliable().tcpNoDelay());
 
+
+  pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_left", 1);
+
+  pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_right", 1);
+
+
+
    pub_stiff_update_ = node_handle.advertise<dynamic_reconfigure::Config>(
     "/dynamic_reconfigure_compliance_param_node/parameter_updates", 5);
 
@@ -297,6 +304,17 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   // left_arm_data.position_other_arm_=position_right;
   // compute error to desired pose
   // position error
+  geometry_msgs::PoseStamped msg_left;
+  msg_left.pose.position.x=position[0];
+  msg_left.pose.position.y=position[1];
+  msg_left.pose.position.z=position[2];
+
+  msg_left.pose.orientation.x=orientation.x();
+  msg_left.pose.orientation.y=orientation.y();
+  msg_left.pose.orientation.z=orientation.z();
+  msg_left.pose.orientation.w=orientation.w();
+  pub_left.publish(msg_left);
+
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - left_arm_data.position_d_;
 
@@ -419,7 +437,16 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   // position error
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - right_arm_data.position_d_;
+  geometry_msgs::PoseStamped msg_right;
+  msg_right.pose.position.x=position[0];
+  msg_right.pose.position.y=position[1];
+  msg_right.pose.position.z=position[2];
 
+  msg_right.pose.orientation.x=orientation.x();
+  msg_right.pose.orientation.y=orientation.y();
+  msg_right.pose.orientation.z=orientation.z();
+  msg_right.pose.orientation.w=orientation.w();
+  pub_right.publish(msg_right);
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_left;
   error_relative.tail(3).setZero();

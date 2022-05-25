@@ -90,6 +90,15 @@ target_link_libraries(bilateral_control
    ${catkin_LIBRARIES}
    franka_bimanual_controllers
 )
+
+add_executable(franka_bimanual_gripper_online
+  src/franka_bimanual_gripper_online.cpp
+)
+
+target_link_libraries(franka_bimanual_gripper_online
+   ${catkin_LIBRARIES}
+   franka_bimanual_controllers
+)
 ## Installation
 install(TARGETS franka_bimanual_controllers
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

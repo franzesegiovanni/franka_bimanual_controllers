@@ -136,10 +136,6 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
       "/equilibrium_pose_left", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left, this,
       ros::TransportHints().reliable().tcpNoDelay());
 
-  sub_stiffness_ = node_handle.subscribe(
-    "/stiffness_", 20, &BiManualCartesianImpedanceControl::equilibriumStiffnessCallback, this,
-    ros::TransportHints().reliable().tcpNoDelay());
-
   sub_nullspace_right_ = node_handle.subscribe(
     "/nullspace_right_", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right, this,
     ros::TransportHints().reliable().tcpNoDelay());
@@ -156,11 +152,6 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_right", 1);
 
   pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_left", 1);
-
-
-
-   pub_stiff_update_ = node_handle.advertise<dynamic_reconfigure::Config>(
-    "/dynamic_reconfigure_compliance_param_node/parameter_updates", 5);
 
   dynamic_reconfigure_compliance_param_node_ =
       ros::NodeHandle("dynamic_reconfigure_compliance_param_node");
@@ -502,122 +493,6 @@ Eigen::Matrix<double, 7, 1> BiManualCartesianImpedanceControl::saturateTorqueRat
   return tau_d_saturated;
     }
 
-void BiManualCartesianImpedanceControl::equilibriumStiffnessCallback(
-    const std_msgs::Float32MultiArray::ConstPtr& stiffness_){
-
-  int i = 0;
-  // print all the remaining numbers
-  for(std::vector<float>::const_iterator it = stiffness_->data.begin(); it != stiffness_->data.end(); ++it)
-  {
-    stiff_[i] = *it;
-    i++;
-  }
-  auto& left_arm_data = arms_data_.at(left_arm_id_);
-  left_arm_data.cartesian_stiffness_(0,0)=std::max(std::min(stiff_[0], float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_(1,1)=std::max(std::min(stiff_[0], float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_(2,2)=std::max(std::min(stiff_[0], float(1000.0)), float(0.0));
-
-  left_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(0,0));
-  left_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(1,1));
-  left_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(2,2));
-
-  left_arm_data.cartesian_stiffness_(3,3)=std::max(std::min(stiff_[1], float(50.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_(4,4)=std::max(std::min(stiff_[1], float(50.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_(5,5)=std::max(std::min(stiff_[1], float(50.0)), float(0.0));
-
-  left_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(3,3));
-  left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(4,4));
-  left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(left_arm_data.cartesian_stiffness_(5,5));
-
-  left_arm_data.nullspace_stiffness_= std::max(std::min(stiff_[2], float(20.0)), float(0.0));
-
-  left_arm_data.cartesian_stiffness_relative_(0,0)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_relative_(1,1)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_relative_(2,2)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_relative_(3,3)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_relative_(4,4)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-  left_arm_data.cartesian_stiffness_relative_(5,5)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-
-  auto& right_arm_data = arms_data_.at(right_arm_id_);
-  right_arm_data.cartesian_stiffness_(0,0)=std::max(std::min(stiff_[3], float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_(1,1)=std::max(std::min(stiff_[3], float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_(2,2)=std::max(std::min(stiff_[3], float(1000.0)), float(0.0));
-
-  right_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(0,0));
-  right_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(1,1));
-  right_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(2,2));
-
-  right_arm_data.cartesian_stiffness_(3,3)=std::max(std::min(stiff_[4], float(50.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_(4,4)=std::max(std::min(stiff_[4], float(50.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_(5,5)=std::max(std::min(stiff_[4], float(50.0)), float(0.0));
-
-  right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(3,3));
-  right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(4,4));
-  right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(right_arm_data.cartesian_stiffness_(5,5));
-
-  right_arm_data.nullspace_stiffness_= std::max(std::min(stiff_[5], float(20.0)), float(0.0));
-
-  right_arm_data.cartesian_stiffness_relative_(0,0)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_relative_(1,1)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_relative_(2,2)= std::max(std::min(stiff_[6], float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_relative_(3,3)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_relative_(4,4)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-  right_arm_data.cartesian_stiffness_relative_(5,5)= std::max(std::min(float(0.0), float(1000.0)), float(0.0));
-
-
-  dynamic_reconfigure::Config set_K_TL;
-  dynamic_reconfigure::DoubleParameter param_TL_double;
-  param_TL_double.name = "left_translational_stiffness";
-  param_TL_double.value = stiff_[0];
-  set_K_TL.doubles = {param_TL_double};
-  pub_stiff_update_.publish(set_K_TL);
-
-  dynamic_reconfigure::Config set_K_RL;
-  dynamic_reconfigure::DoubleParameter param_RL_double;
-  param_RL_double.name = "left_rotational_stiffness";
-  param_RL_double.value = stiff_[1];
-  set_K_RL.doubles = {param_RL_double};
-  pub_stiff_update_.publish(set_K_TL);
-
-
-  dynamic_reconfigure::Config set_K_NSL;
-  dynamic_reconfigure::DoubleParameter param_NSL_double;
-  param_NSL_double.name = "left_nullspace_stiffness";
-  param_NSL_double.value = stiff_[2];
-  set_K_NSL.doubles = {param_NSL_double};
-  pub_stiff_update_.publish(set_K_NSL);
-
-  dynamic_reconfigure::Config set_K_TR;
-  dynamic_reconfigure::DoubleParameter param_TR_double;
-  param_TR_double.name = "right_translational_stiffness";
-  param_TR_double.value = stiff_[3];
-  set_K_TR.doubles = {param_TR_double};
-  pub_stiff_update_.publish(set_K_TR);
-
-  dynamic_reconfigure::Config set_K_RR;
-  dynamic_reconfigure::DoubleParameter param_RR_double;
-  param_RR_double.name = "right_rotational_stiffness";
-  param_RR_double.value = stiff_[4];
-  set_K_RR.doubles = {param_RR_double};
-  pub_stiff_update_.publish(set_K_RR);
-
-  dynamic_reconfigure::Config set_K_NSR;
-  dynamic_reconfigure::DoubleParameter param_NSR_double;
-  param_NSR_double.name = "right_nullspace_stiffness";
-  param_NSR_double.value = stiff_[5];
-  set_K_NSR.doubles = {param_NSR_double};
-  pub_stiff_update_.publish(set_K_NSR);
-
-  dynamic_reconfigure::Config set_K_REL;
-  dynamic_reconfigure::DoubleParameter param_REL_double;
-  param_NSR_double.name = "coupling_translational_stiffness";
-  param_NSR_double.value = stiff_[6];
-  set_K_NSR.doubles = {param_REL_double};
-  pub_stiff_update_.publish(set_K_REL);
-
-}
-
-
 
 void BiManualCartesianImpedanceControl::complianceParamCallback(
     franka_combined_bimanual_controllers::dual_arm_compliance_paramConfig& config,
@@ -746,8 +621,7 @@ void BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_left(co
   left_arm_data.q_d_nullspace_(4) = read_joint_left[4];
   left_arm_data.q_d_nullspace_(5) = read_joint_left[5];
   left_arm_data.q_d_nullspace_(6) = read_joint_left[6];
-  //std::cout << "left_arm_sub";
-  //std::cout << 	left_arm_data.q_d_nullspace_;
+
 }
 }  // namespace franka_bimanual_controllers
 

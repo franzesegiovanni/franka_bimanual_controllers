@@ -153,9 +153,9 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
         ros::TransportHints().reliable().tcpNoDelay());
 
 
-  pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_left", 1);
+  pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_right", 1);
 
-  pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_right", 1);
+  pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_left", 1);
 
 
 
@@ -172,32 +172,8 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   dynamic_server_compliance_param_->setCallback(boost::bind(
       &BiManualCartesianImpedanceControl::complianceParamCallback, this, _1, _2));
 
-  // Get the transformation from right_O_frame to left_O_frame
-  tf::StampedTransform transform;
-  tf::TransformListener listener;
-  try {
-    if (listener.waitForTransform(left_arm_id_ + "_link0", right_arm_id_ + "_link0", ros::Time(0),
-                                  ros::Duration(4.0))) {
-      listener.lookupTransform(left_arm_id_ + "_link0", right_arm_id_ + "_link0", ros::Time(0),
-                               transform);
-    } else {
-      ROS_ERROR(
-          "BiManualCartesianImpedanceControl: Failed to read transform from %s to %s. "
-          "Aborting init!",
-          (right_arm_id_ + "_link0").c_str(), (left_arm_id_ + "_link0").c_str());
-      return false;
-    }
-  } catch (tf::TransformException& ex) {
-    ROS_ERROR("BiManualCartesianImpedanceControl: %s", ex.what());
-    return false;
-  }
-  tf::transformTFToEigen(transform, Ol_T_Or_);  // NOLINT (readability-identifier-naming)
 
-  // Setup publisher for the centering frame.
-  publish_rate_ = franka_hw::TriggerRate(30.0);
-  center_frame_pub_.init(node_handle, "centering_frame", 1, true);
-
-  return left_success && right_success;
+   return left_success && right_success;
 } 
 
 void BiManualCartesianImpedanceControl::starting(const ros::Time& /*time*/) {
@@ -209,16 +185,6 @@ startingArmRight();
   franka::RobotState robot_state_right =
       arms_data_.at(right_arm_id_).state_handle_->getRobotState();
   franka::RobotState robot_state_left = arms_data_.at(left_arm_id_).state_handle_->getRobotState();
-  Eigen::Affine3d Ol_T_EEl(Eigen::Matrix4d::Map(  // NOLINT (readability-identifier-naming)
-      robot_state_left.O_T_EE.data()));           // NOLINT (readability-identifier-naming)
-  Eigen::Affine3d Or_T_EEr(Eigen::Matrix4d::Map(  // NOLINT (readability-identifier-naming)
-      robot_state_right.O_T_EE.data()));          // NOLINT (readability-identifier-naming)
-  EEr_T_EEl_ =
-      Or_T_EEr.inverse() * Ol_T_Or_.inverse() * Ol_T_EEl;  // NOLINT (readability-identifier-naming)
-  EEl_T_C_.setIdentity();
-  Eigen::Vector3d EEr_r_EEr_EEl =  // NOLINT (readability-identifier-naming)
-      EEr_T_EEl_.translation();    // NOLINT (readability-identifier-naming)
-  EEl_T_C_.translation() = -0.5 * EEr_T_EEl_.inverse().rotation() * EEr_r_EEr_EEl;
 }
 
 void BiManualCartesianImpedanceControl::update(const ros::Time& /*time*/,
@@ -699,13 +665,13 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.cartesian_stiffness_relative_.setIdentity();
   right_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
       << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
-  right_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
       << 0.0 * Eigen::Matrix3d::Identity();
 
   right_arm_data.cartesian_damping_relative_.setIdentity();
   right_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
       << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  right_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
           << 0.0 * Eigen::Matrix3d::Identity();
 }
 

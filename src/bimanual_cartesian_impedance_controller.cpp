@@ -689,6 +689,16 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.left_rotational_stiffness_Y);
   left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.left_rotational_stiffness_Z);
 
+  Eigen::AngleAxisd rollAngle_left(config.left_stiffness_roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd yawAngle_left(config.left_stiffness_yaw, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd pitchAngle_left(config.left_stiffness_pitch, Eigen::Vector3d::UnitY());
+  Eigen::Quaternion<double> q_left = rollAngle_left *  pitchAngle_left * yawAngle_left;
+  Eigen::Matrix3d rotationMatrix_left = q_left.matrix();
+  Eigen::Matrix3d rotationMatrix_transpose_left= rotationMatrix_left.transpose();
+  left_arm_data.cartesian_stiffness_.topLeftCorner(3, 3) << rotationMatrix_left*left_arm_data.cartesian_stiffness_.topLeftCorner(3, 3)*rotationMatrix_transpose_left;
+  left_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3) << rotationMatrix_left*left_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)*rotationMatrix_transpose_left;
+  
+  
   left_arm_data.nullspace_stiffness_ = config.left_nullspace_stiffness;
 
   left_arm_data.cartesian_stiffness_relative_.setIdentity();
@@ -703,6 +713,9 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
           << 0.0 * Eigen::Matrix3d::Identity();
   
+
+
+
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   
   right_arm_data.cartesian_stiffness_.setIdentity();
@@ -720,6 +733,15 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.right_rotational_stiffness_X);
   right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.right_rotational_stiffness_Y);
   right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.right_rotational_stiffness_Z);
+
+  Eigen::AngleAxisd rollAngle_right(config.right_stiffness_roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd yawAngle_right(config.right_stiffness_yaw, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd pitchAngle_right(config.right_stiffness_pitch, Eigen::Vector3d::UnitY());
+  Eigen::Quaternion<double> q_right = rollAngle_right *  pitchAngle_right * yawAngle_right;
+  Eigen::Matrix3d rotationMatrix_right = q_right.matrix();
+  Eigen::Matrix3d rotationMatrix_transpose_right= rotationMatrix_right.transpose();
+  right_arm_data.cartesian_stiffness_.topLeftCorner(3, 3) << rotationMatrix_right*right_arm_data.cartesian_stiffness_.topLeftCorner(3, 3)*rotationMatrix_transpose_right;
+  right_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3) << rotationMatrix_right*right_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)*rotationMatrix_transpose_right;
 
   right_arm_data.nullspace_stiffness_ = config.right_nullspace_stiffness;
 

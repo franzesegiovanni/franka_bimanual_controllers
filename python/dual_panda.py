@@ -12,6 +12,7 @@ import time
 import pandas as pd
 from sensor_msgs.msg import JointState, Joy
 from geometry_msgs.msg import Point, WrenchStamped, PoseStamped, Vector3
+import dynamic_reconfigure.client
 from std_msgs.msg import Float32MultiArray
 from sys import exit
 
@@ -54,7 +55,8 @@ class DualPanda():
         vel_right = 0
         vel_left = 0
         print("Move robot to start recording.")
-        while vel_right < trigger or vel_left < trigger :
+
+        while vel_right < trigger and vel_left < trigger :
             vel_right = math.sqrt((self.Panda_right.cart_pos[0]-init_pos_right[0])**2 + (self.Panda_right.cart_pos[1]-init_pos_right[1])**2 + (self.Panda_right.cart_pos[2]-init_pos_right[2])**2)
             vel_left =  math.sqrt((self.Panda_left.cart_pos[0]-init_pos_left[0])**2 + (self.Panda_left.cart_pos[1]-init_pos_left[1])**2 + (self.Panda_left.cart_pos[2]-init_pos_left[2])**2)
         print("Recording started. Press e to stop.")
@@ -70,6 +72,7 @@ class DualPanda():
 class Panda():
 
     def __init__(self, arm_id=''):
+        self.name=arm_id
         self.K_ori  = 30.0
         self.K_cart = 600.0
         self.K_null = 10.0
@@ -96,11 +99,16 @@ class Panda():
     def gripper_callback(self, data):
         self.gripper_pos = data.position[7:9]
 
-
-    def set_stiffness(self,pos_stiff,rot_stiff,null_stiff):
-        stiff_des = Float32MultiArray()
-        stiff_des.data = np.array([pos_stiff[0], pos_stiff[1], pos_stiff[2], rot_stiff[0], rot_stiff[1], rot_stiff[2], null_stiff[0]]).astype(np.float32)
-        self.stiff_pub.publish(stiff_des)    
+    def set_stiffness(self, k_t1, k_t2, k_t3,k_r1,k_r2,k_r3, k_ns):
+        
+        set_K = dynamic_reconfigure.client.Client('/dynamic_reconfigure_compliance_param_node', config_callback=None)
+        set_K.update_configuration({"translational_stiffness_X": k_t1})
+        set_K.update_configuration({"translational_stiffness_Y": k_t2})
+        set_K.update_configuration({"translational_stiffness_Z": k_t3})        
+        set_K.update_configuration({"rotational_stiffness_X": k_r1}) 
+        set_K.update_configuration({"rotational_stiffness_Y": k_r2}) 
+        set_K.update_configuration({"rotational_stiffness_Z": k_r3})
+        set_K.update_configuration({"nullspace_stiffness": k_ns})    
 
     def set_attractor(self,pos,quat):
         goal = PoseStamped()
@@ -177,7 +185,7 @@ class Panda():
             
 
     def Passive(self):
-        pos_stiff=[0.0,0.0,0.0]
+        pos_stiff=[0.0,0.0,0.0] 
         rot_stiff=[self.K_ori , self.K_ori , self.K_ori ] 
         null_stiff=[0.0]
         self.set_stiffness(pos_stiff, rot_stiff, null_stiff)

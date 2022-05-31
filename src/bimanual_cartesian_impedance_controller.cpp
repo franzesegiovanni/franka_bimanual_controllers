@@ -682,12 +682,12 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
    left_arm_data.cartesian_stiffness_(4,4)=config.left_rotational_stiffness_Y;
    left_arm_data.cartesian_stiffness_(5,5)=config.left_rotational_stiffness_Z;
 
-  left_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.left_translational_stiffness_X);
-  left_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.left_translational_stiffness_Y);
-  left_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.left_translational_stiffness_Z);
-  left_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.left_rotational_stiffness_X);
-  left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.left_rotational_stiffness_Y);
-  left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.left_rotational_stiffness_Z);
+  left_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.left_translational_stiffness_X)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.left_translational_stiffness_Y)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.left_translational_stiffness_Z)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.left_rotational_stiffness_X)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.left_rotational_stiffness_Y)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.left_rotational_stiffness_Z)*config.left_damping_ratio;
 
   Eigen::AngleAxisd rollAngle_left(config.left_stiffness_roll, Eigen::Vector3d::UnitX());
   Eigen::AngleAxisd yawAngle_left(config.left_stiffness_yaw, Eigen::Vector3d::UnitZ());
@@ -727,12 +727,12 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.cartesian_stiffness_(4,4)=config.right_rotational_stiffness_Y;
   right_arm_data.cartesian_stiffness_(5,5)=config.right_rotational_stiffness_Z;
 
-  right_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.right_translational_stiffness_X);
-  right_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.right_translational_stiffness_Y);
-  right_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.right_translational_stiffness_Z);
-  right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.right_rotational_stiffness_X);
-  right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.right_rotational_stiffness_Y);
-  right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.right_rotational_stiffness_Z);
+  right_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.right_translational_stiffness_X)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.right_translational_stiffness_Y)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.right_translational_stiffness_Z)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.right_rotational_stiffness_X)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.right_rotational_stiffness_Y)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.right_rotational_stiffness_Z)*config.right_damping_ratio;
 
   Eigen::AngleAxisd rollAngle_right(config.right_stiffness_roll, Eigen::Vector3d::UnitX());
   Eigen::AngleAxisd yawAngle_right(config.right_stiffness_yaw, Eigen::Vector3d::UnitZ());

@@ -41,12 +41,12 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub_left = gripper_left.subscribe("/gripper_left", 0, Gripper_Left);
   ros::Subscriber sub_right = gripper_right.subscribe("/gripper_right", 0, Gripper_Right);
-  ros::Publisher pub_move_left = gripper_left.advertise<franka_gripper::MoveActionGoal>("/panda2_franka_gripper/move/goal", 10);
-  ros::Publisher pub_move_right = gripper_right.advertise<franka_gripper::MoveActionGoal>("/panda1_franka_gripper/move/goal", 10);
+  ros::Publisher pub_move_left = gripper_left.advertise<franka_gripper::MoveActionGoal>("/panda_left_franka_gripper/move/goal", 10);
+  ros::Publisher pub_move_right = gripper_right.advertise<franka_gripper::MoveActionGoal>("/panda_right_franka_gripper/move/goal", 10);
 
   //ros::Publisher pub_stop = n.advertise<franka_gripper::StopAction>("/franka_gripper/stop", 1);
-  ros::Publisher pub_grasp_left = gripper_left.advertise<franka_gripper::GraspActionGoal>("/panda2_franka_gripper/grasp/goal", 10);
-  ros::Publisher pub_grasp_right = gripper_right.advertise<franka_gripper::GraspActionGoal>("/panda1_franka_gripper/grasp/goal", 10);
+  ros::Publisher pub_grasp_left = gripper_left.advertise<franka_gripper::GraspActionGoal>("/panda_left_franka_gripper/grasp/goal", 10);
+  ros::Publisher pub_grasp_right = gripper_right.advertise<franka_gripper::GraspActionGoal>("/panda_right_franka_gripper/grasp/goal", 10);
   franka_gripper::MoveActionGoal msg_move_left;
   franka_gripper::MoveActionGoal msg_move_right;
   franka_gripper::GraspActionGoal msg_grasp_left;

@@ -64,7 +64,6 @@ effort_joint_trajectory_controller:
 panda_right_state_controller:
   type: franka_control/FrankaStateController
   arm_id: panda_right
-  robot_ip: 172.16.0.2
   joint_names:
     - panda_right_joint1
     - panda_right_joint2
@@ -78,7 +77,6 @@ panda_right_state_controller:
 panda_left_state_controller:
   type: franka_control/FrankaStateController
   arm_id: panda_left
-  robot_ip: 172.16.0.3
   joint_names:
     - panda_left_joint1
     - panda_left_joint2

@@ -81,122 +81,122 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_hand:
+        panda_right_hand:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_leftfinger:
+        panda_right_leftfinger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link0:
+        panda_right_link0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link1:
+        panda_right_link1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link2:
+        panda_right_link2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link3:
+        panda_right_link3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link4:
+        panda_right_link4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link5:
+        panda_right_link5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link6:
+        panda_right_link6:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link7:
+        panda_right_link7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_link8:
+        panda_right_link8:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_1_rightfinger:
+        panda_right_rightfinger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_hand:
+        panda_left_hand:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_leftfinger:
+        panda_left_leftfinger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link0:
+        panda_left_link0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link1:
+        panda_left_link1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link2:
+        panda_left_link2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link3:
+        panda_left_link3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link4:
+        panda_left_link4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link5:
+        panda_left_link5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link6:
+        panda_left_link6:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link7:
+        panda_left_link7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_link8:
+        panda_left_link8:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        panda_2_rightfinger:
+        panda_left_rightfinger:
           Alpha: 1
           Show Axes: false
           Show Trail: false

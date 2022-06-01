@@ -1,24 +1,22 @@
 bimanual_cartesian_impedance_controller:
     type: franka_bimanual_controllers/BiManualCartesianImpedanceControl
     right:
-        arm_id: panda_1
+        arm_id: panda_right
         joint_names:
-            - panda_1_joint1
-            - panda_1_joint2
-            - panda_1_joint3
-            - panda_1_joint4
-            - panda_1_joint5
-            - panda_1_joint6
-            - panda_1_joint7
+            - panda_right_joint1
+            - panda_right_joint2
+            - panda_right_joint3
+            - panda_right_joint4
+            - panda_right_joint5
+            - panda_right_joint6
+            - panda_right_joint7
     left:
-        arm_id: panda_2
+        arm_id: panda_left
         joint_names:
-            - panda_2_joint1
-            - panda_2_joint2
-            - panda_2_joint3
-            - panda_2_joint4
-            - panda_2_joint5
-            - panda_2_joint6
-            - panda_2_joint7
-
-
+            - panda_left_joint1
+            - panda_left_joint2
+            - panda_left_joint3
+            - panda_left_joint4
+            - panda_left_joint5
+            - panda_left_joint6
+            - panda_left_joint7

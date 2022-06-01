@@ -143,14 +143,14 @@ class BiManualCartesianImpedanceControl
    * @param[in] arm_data The data container of the arm to control.
    */
   void updateArmLeft();
-  void updateArmRight();  
+  void updateArmRight();
   /**
    * Prepares all internal states to be ready to run the real-time control for one arm.
    *
    * @param[in] arm_data The data container of the arm to prepare for the control loop.
    */
   void startingArmLeft();
-  void startingArmRight();  
+  void startingArmRight();
   ///< Dynamic reconfigure server
   std::unique_ptr<dynamic_reconfigure::Server<
       franka_combined_bimanual_controllers::dual_arm_compliance_paramConfig>>
@@ -171,18 +171,18 @@ class BiManualCartesianImpedanceControl
   ///< Target pose subscriber
   ros::Subscriber sub_equilibrium_pose_right_;
   void equilibriumPoseCallback_right(const geometry_msgs::PoseStampedConstPtr& msg);
+
   ros::Subscriber sub_equilibrium_pose_left_;
   void equilibriumPoseCallback_left(const geometry_msgs::PoseStampedConstPtr& msg);
+
   ros::Subscriber sub_equilibrium_distance_;
   void equilibriumPoseCallback_relative(const geometry_msgs::PoseStampedConstPtr& msg);
-//   ros::Subscriber sub_stiffness_;
-//   void equilibriumStiffnessCallback(const std_msgs::Float32MultiArray::ConstPtr& stiffness_);
 
   ros::Subscriber sub_nullspace_right_;
   void equilibriumConfigurationCallback_right(const sensor_msgs::JointState::ConstPtr& joint);
+
   ros::Subscriber sub_nullspace_left_;
   void equilibriumConfigurationCallback_left(const  sensor_msgs::JointState::ConstPtr&  joint);
-//   ros::Publisher pub_stiff_update_;
 
    ros::Publisher pub_right;
    ros::Publisher pub_left;

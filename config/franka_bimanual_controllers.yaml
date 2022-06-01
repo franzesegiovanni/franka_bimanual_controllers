@@ -20,5 +20,3 @@ bimanual_cartesian_impedance_controller:
             - panda_left_joint5
             - panda_left_joint6
             - panda_left_joint7
-
-

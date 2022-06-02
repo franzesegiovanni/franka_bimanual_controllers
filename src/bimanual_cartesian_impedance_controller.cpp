@@ -130,28 +130,28 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   bool right_success = initArm(robot_hw, right_arm_id_, right_joint_names);
 
   sub_equilibrium_pose_right_ = node_handle.subscribe(
-      "/equilibrium_pose_right", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right, this,
+      "panda_right_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right, this,
       ros::TransportHints().reliable().tcpNoDelay());
   sub_equilibrium_pose_left_ = node_handle.subscribe(
-      "/equilibrium_pose_left", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left, this,
+      "panda_left_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left, this,
       ros::TransportHints().reliable().tcpNoDelay());
 
   sub_nullspace_right_ = node_handle.subscribe(
-    "/nullspace_right_", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right, this,
+    "panda_right_nullspace", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right, this,
     ros::TransportHints().reliable().tcpNoDelay());
 
   sub_nullspace_left_ = node_handle.subscribe(
-    "/nullspace_left_", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_left, this,
+    "panda_left_nullspace", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_left, this,
     ros::TransportHints().reliable().tcpNoDelay());
 
   sub_equilibrium_distance_ = node_handle.subscribe(
-        "/equilibrium_distance", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative, this,
+        "equilibrium_distance", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative, this,
         ros::TransportHints().reliable().tcpNoDelay());
 
 
-  pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_right", 1);
+  pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("panda_right_cartesian_pose", 1);
 
-  pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian_pose_left", 1);
+  pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("panda_left_cartesian_pose", 1);
 
   dynamic_reconfigure_compliance_param_node_ =
       ros::NodeHandle("dynamic_reconfigure_compliance_param_node");
@@ -168,14 +168,8 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
 }
 
 void BiManualCartesianImpedanceControl::starting(const ros::Time& /*time*/) {
-  // for (auto& arm_data : arms_data_) {
-  //   startingArm(arm_data.second);
-  // }
 startingArmLeft();
 startingArmRight();
-  // franka::RobotState robot_state_right =
-  //     arms_data_.at(right_arm_id_).state_handle_->getRobotState();
-  // franka::RobotState robot_state_left = arms_data_.at(left_arm_id_).state_handle_->getRobotState();
 }
 
 void BiManualCartesianImpedanceControl::update(const ros::Time& /*time*/,
@@ -497,78 +491,27 @@ Eigen::Matrix<double, 7, 1> BiManualCartesianImpedanceControl::saturateTorqueRat
 void BiManualCartesianImpedanceControl::complianceParamCallback(
     franka_combined_bimanual_controllers::dual_arm_compliance_paramConfig& config,
     uint32_t /*level*/) {
-  // auto& left_arm_data = arms_data_.at(left_arm_id_);
-  // left_arm_data.cartesian_stiffness_.setIdentity();
-  // left_arm_data.cartesian_stiffness_.topLeftCorner(3, 3)
-  //     << config.left_translational_stiffness * Eigen::Matrix3d::Identity();
-  // left_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)
-  //     << config.left_rotational_stiffness * Eigen::Matrix3d::Identity();
-  // left_arm_data.cartesian_damping_.setIdentity();
-
-  // left_arm_data.cartesian_damping_.topLeftCorner(3, 3)
-  //     << 2 * sqrt(config.left_translational_stiffness) * Eigen::Matrix3d::Identity();
-  // left_arm_data.cartesian_damping_.bottomRightCorner(3, 3)
-  //     << 2 * sqrt(config.left_rotational_stiffness) * Eigen::Matrix3d::Identity();
-  // left_arm_data.nullspace_stiffness_ = config.left_nullspace_stiffness;
-
-  // left_arm_data.cartesian_stiffness_relative_.setIdentity();
-  // left_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
-  //     << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
-  // left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
-  //     << 0.0 * Eigen::Matrix3d::Identity();
-
-  // left_arm_data.cartesian_damping_relative_.setIdentity();
-  // left_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
-  //     << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  // left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
-  //         << 0.0 * Eigen::Matrix3d::Identity();
-
-  // auto& right_arm_data = arms_data_.at(right_arm_id_);
-  // right_arm_data.cartesian_stiffness_.setIdentity();
-  // right_arm_data.cartesian_stiffness_.topLeftCorner(3, 3)
-  //     << config.right_translational_stiffness * Eigen::Matrix3d::Identity();
-  // right_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)
-  //     << config.right_rotational_stiffness * Eigen::Matrix3d::Identity();
-  // right_arm_data.cartesian_damping_.setIdentity();
-
-  // right_arm_data.cartesian_damping_.topLeftCorner(3, 3)
-  //     << 2 * sqrt(config.right_translational_stiffness) * Eigen::Matrix3d::Identity();
-  // right_arm_data.cartesian_damping_.bottomRightCorner(3, 3)
-  //     << 2 * sqrt(config.right_rotational_stiffness) * Eigen::Matrix3d::Identity();
-  // right_arm_data.nullspace_stiffness_ = config.right_nullspace_stiffness;
-
-  // right_arm_data.cartesian_stiffness_relative_.setIdentity();
-  // right_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
-  //     << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
-  // right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
-  //     << 0.0 * Eigen::Matrix3d::Identity();
-
-  // right_arm_data.cartesian_damping_relative_.setIdentity();
-  // right_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
-  //     << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  // right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
-  //         << 0.0 * Eigen::Matrix3d::Identity();
 
    auto& left_arm_data = arms_data_.at(left_arm_id_);
 
    left_arm_data.cartesian_stiffness_.setIdentity();
-   left_arm_data.cartesian_stiffness_(0,0)=config.left_translational_stiffness_X;
-   left_arm_data.cartesian_stiffness_(1,1)=config.left_translational_stiffness_Y;
-   left_arm_data.cartesian_stiffness_(2,2)=config.left_translational_stiffness_Z;
-   left_arm_data.cartesian_stiffness_(3,3)=config.left_rotational_stiffness_X;
-   left_arm_data.cartesian_stiffness_(4,4)=config.left_rotational_stiffness_Y;
-   left_arm_data.cartesian_stiffness_(5,5)=config.left_rotational_stiffness_Z;
+   left_arm_data.cartesian_stiffness_(0,0)=config.panda_left_translational_stiffness_X;
+   left_arm_data.cartesian_stiffness_(1,1)=config.panda_left_translational_stiffness_Y;
+   left_arm_data.cartesian_stiffness_(2,2)=config.panda_left_translational_stiffness_Z;
+   left_arm_data.cartesian_stiffness_(3,3)=config.panda_left_rotational_stiffness_X;
+   left_arm_data.cartesian_stiffness_(4,4)=config.panda_left_rotational_stiffness_Y;
+   left_arm_data.cartesian_stiffness_(5,5)=config.panda_left_rotational_stiffness_Z;
 
-  left_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.left_translational_stiffness_X)*config.left_damping_ratio;
-  left_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.left_translational_stiffness_Y)*config.left_damping_ratio;
-  left_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.left_translational_stiffness_Z)*config.left_damping_ratio;
-  left_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.left_rotational_stiffness_X)*config.left_damping_ratio;
-  left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.left_rotational_stiffness_Y)*config.left_damping_ratio;
-  left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.left_rotational_stiffness_Z)*config.left_damping_ratio;
+  left_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.panda_left_translational_stiffness_X)*config.panda_left_damping_ratio;
+  left_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.panda_left_translational_stiffness_Y)*config.panda_left_damping_ratio;
+  left_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.panda_left_translational_stiffness_Z)*config.panda_left_damping_ratio;
+  left_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.panda_left_rotational_stiffness_X)*config.panda_left_damping_ratio;
+  left_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.panda_left_rotational_stiffness_Y)*config.panda_left_damping_ratio;
+  left_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.panda_left_rotational_stiffness_Z)*config.panda_left_damping_ratio;
 
-  Eigen::AngleAxisd rollAngle_left(config.left_stiffness_roll, Eigen::Vector3d::UnitX());
-  Eigen::AngleAxisd yawAngle_left(config.left_stiffness_yaw, Eigen::Vector3d::UnitZ());
-  Eigen::AngleAxisd pitchAngle_left(config.left_stiffness_pitch, Eigen::Vector3d::UnitY());
+  Eigen::AngleAxisd rollAngle_left(config.panda_left_stiffness_roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd yawAngle_left(config.panda_left_stiffness_yaw, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd pitchAngle_left(config.panda_left_stiffness_pitch, Eigen::Vector3d::UnitY());
   Eigen::Quaternion<double> q_left = rollAngle_left *  pitchAngle_left * yawAngle_left;
   Eigen::Matrix3d rotationMatrix_left = q_left.matrix();
   Eigen::Matrix3d rotationMatrix_transpose_left= rotationMatrix_left.transpose();
@@ -576,7 +519,7 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   left_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3) << rotationMatrix_left*left_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)*rotationMatrix_transpose_left;
 
 
-  left_arm_data.nullspace_stiffness_ = config.left_nullspace_stiffness;
+  left_arm_data.nullspace_stiffness_ = config.panda_left_nullspace_stiffness;
 
   left_arm_data.cartesian_stiffness_relative_.setIdentity();
   left_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
@@ -597,30 +540,30 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
 
   right_arm_data.cartesian_stiffness_.setIdentity();
 
-  right_arm_data.cartesian_stiffness_(0,0)=config.right_translational_stiffness_X;
-  right_arm_data.cartesian_stiffness_(1,1)=config.right_translational_stiffness_Y;
-  right_arm_data.cartesian_stiffness_(2,2)=config.right_translational_stiffness_Z;
-  right_arm_data.cartesian_stiffness_(3,3)=config.right_rotational_stiffness_X;
-  right_arm_data.cartesian_stiffness_(4,4)=config.right_rotational_stiffness_Y;
-  right_arm_data.cartesian_stiffness_(5,5)=config.right_rotational_stiffness_Z;
+  right_arm_data.cartesian_stiffness_(0,0)=config.panda_right_translational_stiffness_X;
+  right_arm_data.cartesian_stiffness_(1,1)=config.panda_right_translational_stiffness_Y;
+  right_arm_data.cartesian_stiffness_(2,2)=config.panda_right_translational_stiffness_Z;
+  right_arm_data.cartesian_stiffness_(3,3)=config.panda_right_rotational_stiffness_X;
+  right_arm_data.cartesian_stiffness_(4,4)=config.panda_right_rotational_stiffness_Y;
+  right_arm_data.cartesian_stiffness_(5,5)=config.panda_right_rotational_stiffness_Z;
 
-  right_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.right_translational_stiffness_X)*config.right_damping_ratio;
-  right_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.right_translational_stiffness_Y)*config.right_damping_ratio;
-  right_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.right_translational_stiffness_Z)*config.right_damping_ratio;
-  right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.right_rotational_stiffness_X)*config.right_damping_ratio;
-  right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.right_rotational_stiffness_Y)*config.right_damping_ratio;
-  right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.right_rotational_stiffness_Z)*config.right_damping_ratio;
+  right_arm_data.cartesian_damping_(0,0)=2.0 * sqrt(config.panda_right_translational_stiffness_X)*config.panda_right_damping_ratio;
+  right_arm_data.cartesian_damping_(1,1)=2.0 * sqrt(config.panda_right_translational_stiffness_Y)*config.panda_right_damping_ratio;
+  right_arm_data.cartesian_damping_(2,2)=2.0 * sqrt(config.panda_right_translational_stiffness_Z)*config.panda_right_damping_ratio;
+  right_arm_data.cartesian_damping_(3,3)=2.0 * sqrt(config.panda_right_rotational_stiffness_X)*config.panda_right_damping_ratio;
+  right_arm_data.cartesian_damping_(4,4)=2.0 * sqrt(config.panda_right_rotational_stiffness_Y)*config.panda_right_damping_ratio;
+  right_arm_data.cartesian_damping_(5,5)=2.0 * sqrt(config.panda_right_rotational_stiffness_Z)*config.panda_right_damping_ratio;
 
-  Eigen::AngleAxisd rollAngle_right(config.right_stiffness_roll, Eigen::Vector3d::UnitX());
-  Eigen::AngleAxisd yawAngle_right(config.right_stiffness_yaw, Eigen::Vector3d::UnitZ());
-  Eigen::AngleAxisd pitchAngle_right(config.right_stiffness_pitch, Eigen::Vector3d::UnitY());
+  Eigen::AngleAxisd rollAngle_right(config.panda_right_stiffness_roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd yawAngle_right(config.panda_right_stiffness_yaw, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd pitchAngle_right(config.panda_right_stiffness_pitch, Eigen::Vector3d::UnitY());
   Eigen::Quaternion<double> q_right = rollAngle_right *  pitchAngle_right * yawAngle_right;
   Eigen::Matrix3d rotationMatrix_right = q_right.matrix();
   Eigen::Matrix3d rotationMatrix_transpose_right= rotationMatrix_right.transpose();
   right_arm_data.cartesian_stiffness_.topLeftCorner(3, 3) << rotationMatrix_right*right_arm_data.cartesian_stiffness_.topLeftCorner(3, 3)*rotationMatrix_transpose_right;
   right_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3) << rotationMatrix_right*right_arm_data.cartesian_stiffness_.bottomRightCorner(3, 3)*rotationMatrix_transpose_right;
 
-  right_arm_data.nullspace_stiffness_ = config.right_nullspace_stiffness;
+  right_arm_data.nullspace_stiffness_ = config.panda_right_nullspace_stiffness;
 
 
   right_arm_data.cartesian_stiffness_relative_.setIdentity();
@@ -644,9 +587,8 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left(
   Eigen::Quaterniond last_orientation_d_(left_arm_data.orientation_d_);
   left_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
-  if (last_orientation_d_.coeffs().dot(left_arm_data.orientation_d_.coeffs()) < 0.0) {
-    left_arm_data.orientation_d_.coeffs() << -left_arm_data.orientation_d_.coeffs();
-}
+  // if (last_orientation_d_.coeffs().dot(left_arm_data.orientation_d_.coeffs()) < 0.0) {
+  //   left_arm_data.orientation_d_.coeffs() << -left_arm_data.orientation_d_.coeffs();}
 }
 
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
@@ -656,9 +598,8 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
   Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_);
   right_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
-  if (last_orientation_d_.coeffs().dot(right_arm_data.orientation_d_.coeffs()) < 0.0) {
-    right_arm_data.orientation_d_.coeffs() << -right_arm_data.orientation_d_.coeffs();
-}
+  // if (last_orientation_d_.coeffs().dot(right_arm_data.orientation_d_.coeffs()) < 0.0) {
+  //   right_arm_data.orientation_d_.coeffs() << -right_arm_data.orientation_d_.coeffs();}
 }
 
 
@@ -668,18 +609,6 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative(
   auto&  left_arm_data = arms_data_.at(left_arm_id_);
   left_arm_data.position_d_relative_  << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
   right_arm_data.position_d_relative_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-
-  //Eigen::Quaterniond last_orientation_d_(left_arm_data.orientation_d_relative_);
-  //left_arm_data.orientation_d_relative_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
-  //    msg->pose.orientation.z, msg->pose.orientation.w;
-  //if (last_orientation_d_.coeffs().dot(left_arm_data.orientation_d_relative_.coeffs()) < 0.0) {
-  //  left_arm_data.orientation_d_relative_.coeffs() << -left_arm_data.orientation_d_relative_.coeffs();
-
-  //Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_relative_);
-  //right_arm_data.orientation_d_relative_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
-  //    msg->pose.orientation.z, msg->pose.orientation.w;
-  //if (last_orientation_d_.coeffs().dot(right_arm_data.orientation_d_relative_.coeffs()) < 0.0) {
-  //  right_arm_data.orientation_d_relative_.coeffs() << -right_arm_data.orientation_d_relative_.coeffs();
 }
 
 void BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right(const sensor_msgs::JointState::ConstPtr& joint) {

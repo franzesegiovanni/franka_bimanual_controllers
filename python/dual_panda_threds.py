@@ -13,8 +13,7 @@ import pandas as pd
 from sensor_msgs.msg import JointState, Joy
 from geometry_msgs.msg import Point, WrenchStamped, PoseStamped, Vector3
 import dynamic_reconfigure.client
-from std_msgs.msg import Float32MultiArray
-from sys import exit
+from std_msgs.msg import Float32MultiArray, Bool, Float32
 
 from pynput.keyboard import Listener, KeyCode
 
@@ -34,7 +33,7 @@ class DualPanda():
     def _on_press(self, key):
         # This function runs on the background and checks if a keyboard key was pressed
         if key == KeyCode.from_char('e'):
-            self.end = True    
+            self.end = True   
        # spacemouse joystick subscriber
 
     def teleop_callback(self, data):
@@ -46,8 +45,8 @@ class DualPanda():
     
     def Kinesthetic_Demonstration_BiManual(self, trigger=0.005): 
         r=rospy.Rate(self.rec_freq)
-        self.Panda_left.Passive()
-        self.Panda_right.Passive()
+        self.Panda_left.set_stiffness(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.Panda_right.set_stiffness(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
         self.end = False
         init_pos_right = self.Panda_right.cart_pos
@@ -73,19 +72,36 @@ class DualPanda():
 class Panda():
 
     def __init__(self, arm_id=''):
+        self.rec_freq=10
+        self.control_freq=100
         self.name=arm_id
         self.K_ori  = 30.0
         self.K_cart = 600.0
         self.K_null = 0.0
         self.start = True
         self.end = False
-        rospy.Subscriber("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_cartesian_pose", PoseStamped, self.ee_pose_callback)
+        rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_cartesian_pose", PoseStamped, self.ee_pose_callback)
         rospy.Subscriber("panda_dual/"+str(self.name)+"_state_controller/joint_states", JointState, self.joint_callback)
         rospy.Subscriber("panda_dual/"+str(self.name)+"_state_controller/joint_states", JointState, self.gripper_callback)
 
-        self.goal_pub  = rospy.Publisher("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_equilibrium_pose", PoseStamped, queue_size=0)
-        self.configuration_pub = rospy.Publisher("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+ "_nullspace",Float32MultiArray, queue_size=0)
-    
+        self.goal_pub  = rospy.Publisher("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_equilibrium_pose", PoseStamped, queue_size=0)
+        self.configuration_pub = rospy.Publisher("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+ "_nullspace",JointState, queue_size=0)
+        self.configuration_pub = rospy.Publisher(str(self.name)+ "_gripper",Float32, queue_size=0)
+
+        rospy.Subscriber("panda_dual/"+str(self.name)+"/goto", PoseStamped, self.go_to_3d)
+        rospy.Subscriber("panda_dual/"+str(self.name)+"/execute", Bool, self.execute)
+
+        self.goto_pub = rospy.Publisher("panda_dual/"+str(self.name)+"/goto", PoseStamped, queue_size=0)
+        self.execute_pub = rospy.Publisher("panda_dual/"+str(self.name)+"/execute", Bool, queue_size=0)
+
+        self.listener = Listener(on_press=self._on_press)
+        self.listener.start()
+
+    def _on_press(self, key):
+        # This function runs on the background and checks if a keyboard key was pressed
+        if key == KeyCode.from_char('e'):
+            self.end = True
+
     def ee_pose_callback(self, data):
         self.cart_pos = [data.pose.position.x, data.pose.position.y, data.pose.position.z]
         self.cart_ori = [data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w]
@@ -131,12 +147,52 @@ class Panda():
         joint_des.data= np.array(joint).astype(np.float32)
         self.configuration_pub.publish(joint_des)
 
+    def execute_traj(self):
+        goal = Bool()
+        goal.data=True
+        self.execute_pub.publish(goal)
 
-        
-    def go_to_3d(self,goal_):
+    def execute(self, start):
+        r=rospy.Rate(self.rec_freq)
+
+        if start.data is True:
+            self.set_stiffness(400.0, 400.0, 400.0, 30.0, 30.0, 30.0, 0.0)
+
+            for i in range (self.recorded_traj.shape[1]):
+                position=[self.recorded_traj[0][i],self.recorded_traj[1][i],self.recorded_traj[2][i]]
+                orientation=[self.recorded_ori[0][i], self.recorded_ori[1][i], self.recorded_ori[2][i], self.recorded_ori[3][i]]
+                self.set_attractor(position,orientation)
+            
+                # grip_command = Float32()
+                # grip_command.data = self.recorded_gripper[0,i]
+                # self.grip_pub.publish(grip_command) 
+
+                r.sleep()
+        start.data=False
+
+    def go_to_start(self):
+        goal = PoseStamped()
+        goal.header.seq = 1
+        goal.header.stamp = rospy.Time.now()
+        goal.header.frame_id = "map"
+        goal.pose.position.x = self.recorded_traj[0][0]
+        goal.pose.position.y = self.recorded_traj[1][0]
+        goal.pose.position.z = self.recorded_traj[2][0]
+
+        goal.pose.orientation.x = self.recorded_ori[0][0]
+        goal.pose.orientation.y = self.recorded_ori[1][0]
+        goal.pose.orientation.z = self.recorded_ori[2][0]
+        goal.pose.orientation.w = self.recorded_ori[3][0]
+
+        self.goto_pub.publish(goal)
+
+    def go_to_3d(self, data):
         start = self.cart_pos
+        start_ori=self.cart_ori
         r=rospy.Rate(self.control_freq)
         # interpolate from start to goal with attractor distance of approx 1 mm
+        goal_ = [data.pose.position.x, data.pose.position.y, data.pose.position.z]
+        goal_ori_ = [data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w]
         squared_dist = np.sum(np.subtract(start, goal_)**2, axis=0)
         dist = np.sqrt(squared_dist)
         interp_dist = 0.001  # [m]
@@ -145,26 +201,29 @@ class Panda():
         x = np.linspace(start[0], goal_[0], step_num)
         y = np.linspace(start[1], goal_[1], step_num)
         z = np.linspace(start[2], goal_[2], step_num)
-        
+        rot_x= np.linspace(start_ori[0], goal_ori_[0], step_num)
+        rot_y= np.linspace(start_ori[1], goal_ori_[1], step_num)
+        rot_z= np.linspace(start_ori[2], goal_ori_[2], step_num)
+        rot_w= np.linspace(start_ori[3], goal_ori_[3], step_num)
         position=[x[0],y[0],z[0]]
-        orientation=[1,0,0,0]
+        orientation=[rot_x[0], rot_y[0], rot_z[0], rot_w[0]]
         self.set_attractor(position, orientation)
 
-        pos_stiff=[self.K_cart, self.K_cart, self.K_cart]
-        rot_stiff=[self.K_ori, self.K_ori, self.K_ori]
-        null_stiff=[0]
-        self.set_stiffness(pos_stiff, rot_stiff, null_stiff)
+        # pos_stiff=[self.K_cart, self.K_cart, self.K_cart]
+        # rot_stiff=[self.K_ori, self.K_ori, self.K_ori]
+        # null_stiff=[0]
+        self.set_stiffness(self.K_cart, self.K_cart, self.K_cart, self.K_ori, self.K_ori, self.K_ori, 0)
 
         # send attractors to controller
         for i in range(step_num):
             position=[x[i],y[i],z[i]]
-            orientation=[1,0,0,0]
+            orientation=[rot_x[i], rot_y[i], rot_z[i], rot_w[i]]
             self.set_attractor(position,orientation)
             r.sleep()
 
     def Kinesthetic_Demonstration(self, trigger=0.005): 
         r=rospy.Rate(self.rec_freq)
-        self.Passive()
+        self.set_stiffness(0,0,0,0,0,0,0)
 
         self.end = False
         init_pos = self.cart_pos
@@ -176,16 +235,12 @@ class Panda():
         print("Recording started. Press e to stop.")
 
         self.recorded_traj = self.cart_pos
+        self.recorded_ori= self.cart_ori
         self.recorded_joint= self.joint_pos
         while not self.end:
 
             self.recorded_traj = np.c_[self.recorded_traj, self.cart_pos]
+            self.recorded_ori= np.c_[self.recorded_ori, self.cart_ori]
             self.recorded_joint = np.c_[self.recorded_joint, self.joint_pos]
             r.sleep()
-            
-
-    def Passive(self):
-        pos_stiff=[0.0,0.0,0.0] 
-        rot_stiff=[self.K_ori , self.K_ori , self.K_ori ] 
-        null_stiff=[0.0]
-        self.set_stiffness(pos_stiff, rot_stiff, null_stiff)
+        

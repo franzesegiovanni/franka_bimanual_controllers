@@ -39,8 +39,8 @@ int main(int argc, char **argv)
   ros::NodeHandle gripper_right;
   ros::Rate loop_rate(200);
 
-  ros::Subscriber sub_left = gripper_left.subscribe("/gripper_left", 0, Gripper_Left);
-  ros::Subscriber sub_right = gripper_right.subscribe("/gripper_right", 0, Gripper_Right);
+  ros::Subscriber sub_left = gripper_left.subscribe("/panda_left_gripper", 0, Gripper_Left);
+  ros::Subscriber sub_right = gripper_right.subscribe("/panda_right_gripper", 0, Gripper_Right);
   ros::Publisher pub_move_left = gripper_left.advertise<franka_gripper::MoveActionGoal>("/panda_left_franka_gripper/move/goal", 10);
   ros::Publisher pub_move_right = gripper_right.advertise<franka_gripper::MoveActionGoal>("/panda_right_franka_gripper/move/goal", 10);
 

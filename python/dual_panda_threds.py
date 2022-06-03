@@ -61,16 +61,16 @@ class DualPanda():
             vel_left =  math.sqrt((self.Panda_left.cart_pos[0]-init_pos_left[0])**2 + (self.Panda_left.cart_pos[1]-init_pos_left[1])**2 + (self.Panda_left.cart_pos[2]-init_pos_left[2])**2)
         print("Recording started. Press e to stop.")
 
-        self.recorded_traj_dual = [self.Panda_right.cart_pos, self.Panda_left.cart_pos] 
-        self.recorded_joint_dual= [self.Panda_right.joint_pos, self.Panda_left.joint_pos] 
-        self.recorded_ori_dual=   [self.Panda_right.cart_ori, self.Panda_left.cart_ori] 
-        self.recorded_gripper_dual= [self.Panda_right.gripper_width, self.Panda_left.gripper_width]
+        self.recorded_traj_dual = np.r_[self.Panda_right.cart_pos, self.Panda_left.cart_pos]
+        self.recorded_joint_dual=  np.r_[self.Panda_right.joint_pos, self.Panda_left.joint_pos]
+        self.recorded_ori_dual=   np.r_[self.Panda_right.cart_ori, self.Panda_left.cart_ori] 
+        self.recorded_gripper_dual= np.r_[self.Panda_right.gripper_width, self.Panda_left.gripper_width]
         while not self.end:
 
-            self.recorded_traj_dual = np.c_[self.recorded_traj_dual, [self.Panda_right.cart_pos, self.Panda_left.cart_pos] ]
-            self.recorded_gripper_dual= np.c_[self.recorded_ori_dual,[self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
-            self.recorded_joint_dual = np.c_[self.recorded_joint_dual, [self.Panda_right.joint_pos, self.Panda_left.joint_pos]]
-            self.recorded_gripper_dual= np.c_[self.recorded_gripper_dual, [self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
+            self.recorded_traj_dual = np.c_[self.recorded_traj_dual, np.r_[self.Panda_right.cart_pos, self.Panda_left.cart_pos] ]
+            self.recorded_ori_dual= np.c_[self.recorded_ori_dual, np.r_[self.Panda_right.cart_ori, self.Panda_left.cart_ori]]
+            self.recorded_joint_dual = np.c_[self.recorded_joint_dual, np.r_[self.Panda_right.joint_pos, self.Panda_left.joint_pos]]
+            self.recorded_gripper_dual= np.c_[self.recorded_gripper_dual, np.r_[self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
             r.sleep()
             
     def execute_dual(self):
@@ -137,7 +137,7 @@ class Panda():
         self.end = False
         rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_cartesian_pose", PoseStamped, self.ee_pose_callback)
         rospy.Subscriber("panda_dual/"+str(self.name)+"_state_controller/joint_states", JointState, self.joint_callback)
-        rospy.Subscriber(str(self.name)+"_franka_gripper/joint_states", JointState, self.gripper_callback)
+        rospy.Subscriber("/"+str(self.name)+"_franka_gripper/joint_states", JointState, self.gripper_callback)
         
         self.goal_pub  = rospy.Publisher("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_equilibrium_pose", PoseStamped, queue_size=0)
         self.configuration_pub = rospy.Publisher("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+ "_nullspace",JointState, queue_size=0)
@@ -168,7 +168,7 @@ class Panda():
 
     # gripper state subscriber
     def gripper_callback(self, data):
-        self.gripper_width = data.position[7]+data.position[8]
+        self.gripper_width = data.position[0]+data.position[1]
 
     def set_stiffness(self, k_t1, k_t2, k_t3,k_r1,k_r2,k_r3, k_ns):
         
@@ -260,22 +260,23 @@ class Panda():
         y = np.linspace(start[1], goal_[1], step_num)
         z = np.linspace(start[2], goal_[2], step_num)
         quat=np.slerp_vectorized(q_start, q_goal, 0)
+
         position=[x[0],y[0],z[0]]
-        orientation=[quat[1], quat[2], quat[3], quat[0]]
+        orientation=[quat.x, quat.y, quat.z, quat.w]
         self.set_attractor(position, orientation)
 
         # pos_stiff=[self.K_cart, self.K_cart, self.K_cart]
         # rot_stiff=[self.K_ori, self.K_ori, self.K_ori]
         # null_stiff=[0]
         self.set_stiffness(self.K_cart, self.K_cart, self.K_cart, self.K_ori, self.K_ori, self.K_ori, 0)
-        gripper_width=Float32()
-        gripper_width.data=self.recorded_gripper[0]
-        self.gripper_pub(gripper_width)
+        # gripper_width=Float32()
+        # gripper_width.data=self.recorded_gripper[0]
+        # self.gripper_pub(gripper_width)
         # send attractors to controller
         for i in range(step_num):
             position=[x[i],y[i],z[i]]
             quat=np.slerp_vectorized(q_start, q_goal, i/step_num)
-            orientation=[quat[1], quat[2], quat[3], quat[0]]
+            orientation=[quat.x, quat.y, quat.z, quat.w]
             self.set_attractor(position,orientation)
             r.sleep()
 

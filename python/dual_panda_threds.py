@@ -8,6 +8,7 @@ This code is part of TERI (TEaching Robots Interactively) project
 import rospy
 import math
 import numpy as np
+import quaternion
 import time
 import pandas as pd
 from sensor_msgs.msg import JointState, Joy
@@ -62,13 +63,67 @@ class DualPanda():
 
         self.recorded_traj_dual = [self.Panda_right.cart_pos, self.Panda_left.cart_pos] 
         self.recorded_joint_dual= [self.Panda_right.joint_pos, self.Panda_left.joint_pos] 
+        self.recorded_ori_dual=   [self.Panda_right.cart_ori, self.Panda_left.cart_ori] 
+        self.recorded_gripper_dual= [self.Panda_right.gripper_width, self.Panda_left.gripper_width]
         while not self.end:
 
-            self.recorded_traj_dual = np.c_[self.recorded_traj, [self.Panda_right.cart_pos, self.Panda_left.cart_pos] ]
-            self.recorded_joint_dual = np.c_[self.recorded_joint, [self.Panda_right.joint_pos, self.Panda_left.joint_pos]]
+            self.recorded_traj_dual = np.c_[self.recorded_traj_dual, [self.Panda_right.cart_pos, self.Panda_left.cart_pos] ]
+            self.recorded_gripper_dual= np.c_[self.recorded_ori_dual,[self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
+            self.recorded_joint_dual = np.c_[self.recorded_joint_dual, [self.Panda_right.joint_pos, self.Panda_left.joint_pos]]
+            self.recorded_gripper_dual= np.c_[self.recorded_gripper_dual, [self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
+            r.sleep()
+            
+    def execute_dual(self):
+        r=rospy.Rate(self.rec_freq)
+
+        self.Panda_right.set_stiffness(400.0, 400.0, 400.0, 30.0, 30.0, 30.0, 0.0)
+        self.Panda_left.set_stiffness(400.0, 400.0, 400.0, 30.0, 30.0, 30.0, 0.0)
+        for i in range (self.recorded_traj_dual.shape[1]):
+            position=[self.recorded_traj_dual[0][i],self.recorded_traj_dual[1][i],self.recorded_traj_dual[2][i]]
+            orientation=[self.recorded_ori_dual[0][i], self.recorded_ori_dual[1][i], self.recorded_ori_dual[2][i], self.recorded_ori_dual[3][i]]
+            self.Panda_right.set_attractor(position,orientation)
+            grip_command = Float32()
+            grip_command.data = self.recorded_gripper_dual[0][i]
+            self.Panda_right.gripper_pub.publish(grip_command) 
+
+            position=[self.recorded_traj_dual[3][i],self.recorded_traj_dual[4][i],self.recorded_traj_dual[5][i]]
+            orientation=[self.recorded_ori_dual[4][i], self.recorded_ori_dual[5][i], self.recorded_ori_dual[6][i], self.recorded_ori_dual[7][i]]
+            self.Panda_left.set_attractor(position,orientation)
+            grip_command = Float32()
+            grip_command.data = self.recorded_gripper_dual[1][i]
+            self.Panda_left.gripper_pub.publish(grip_command) 
             r.sleep()
 
+    def go_to_start(self):
+        goal = PoseStamped()
+        goal.header.seq = 1
+        goal.header.stamp = rospy.Time.now()
+        goal.header.frame_id = "map"
+        goal.pose.position.x = self.recorded_traj_dual[0][0]
+        goal.pose.position.y = self.recorded_traj_dual[1][0]
+        goal.pose.position.z = self.recorded_traj_dual[2][0]
 
+        goal.pose.orientation.x = self.recorded_ori_dual[0][0]
+        goal.pose.orientation.y = self.recorded_ori_dual[1][0]
+        goal.pose.orientation.z = self.recorded_ori_dual[2][0]
+        goal.pose.orientation.w = self.recorded_ori_dual[3][0]
+
+        self.Panda_right.goto_pub.publish(goal)
+
+        goal = PoseStamped()
+        goal.header.seq = 1
+        goal.header.stamp = rospy.Time.now()
+        goal.header.frame_id = "map"
+        goal.pose.position.x = self.recorded_traj_dual[3][0]
+        goal.pose.position.y = self.recorded_traj_dual[4][0]
+        goal.pose.position.z = self.recorded_traj_dual[5][0]
+
+        goal.pose.orientation.x = self.recorded_ori_dual[4][0]
+        goal.pose.orientation.y = self.recorded_ori_dual[5][0]
+        goal.pose.orientation.z = self.recorded_ori_dual[6][0]
+        goal.pose.orientation.w = self.recorded_ori_dual[7][0]
+
+        self.Panda_left.goto_pub.publish(goal)
 class Panda():
 
     def __init__(self, arm_id=''):
@@ -82,11 +137,11 @@ class Panda():
         self.end = False
         rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_cartesian_pose", PoseStamped, self.ee_pose_callback)
         rospy.Subscriber("panda_dual/"+str(self.name)+"_state_controller/joint_states", JointState, self.joint_callback)
-        rospy.Subscriber("panda_dual/"+str(self.name)+"_state_controller/joint_states", JointState, self.gripper_callback)
-
+        rospy.Subscriber(str(self.name)+"_franka_gripper/joint_states", JointState, self.gripper_callback)
+        
         self.goal_pub  = rospy.Publisher("/panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+"_equilibrium_pose", PoseStamped, queue_size=0)
         self.configuration_pub = rospy.Publisher("panda_dual/bimanual_cartesian_impedance_controller/"+str(self.name)+ "_nullspace",JointState, queue_size=0)
-        self.configuration_pub = rospy.Publisher(str(self.name)+ "_gripper",Float32, queue_size=0)
+        self.gripper_pub = rospy.Publisher(str(self.name)+ "_gripper",Float32, queue_size=0)
 
         rospy.Subscriber("panda_dual/"+str(self.name)+"/goto", PoseStamped, self.go_to_3d)
         rospy.Subscriber("panda_dual/"+str(self.name)+"/execute", Bool, self.execute)
@@ -113,7 +168,7 @@ class Panda():
 
     # gripper state subscriber
     def gripper_callback(self, data):
-        self.gripper_pos = data.position[7:9]
+        self.gripper_width = data.position[7]+data.position[8]
 
     def set_stiffness(self, k_t1, k_t2, k_t3,k_r1,k_r2,k_r3, k_ns):
         
@@ -162,10 +217,10 @@ class Panda():
                 position=[self.recorded_traj[0][i],self.recorded_traj[1][i],self.recorded_traj[2][i]]
                 orientation=[self.recorded_ori[0][i], self.recorded_ori[1][i], self.recorded_ori[2][i], self.recorded_ori[3][i]]
                 self.set_attractor(position,orientation)
-            
-                # grip_command = Float32()
-                # grip_command.data = self.recorded_gripper[0,i]
-                # self.grip_pub.publish(grip_command) 
+ 
+                grip_command = Float32()
+                grip_command.data = self.recorded_gripper[0,i]
+                self.grip_pub.publish(grip_command) 
 
                 r.sleep()
         start.data=False
@@ -192,7 +247,10 @@ class Panda():
         r=rospy.Rate(self.control_freq)
         # interpolate from start to goal with attractor distance of approx 1 mm
         goal_ = [data.pose.position.x, data.pose.position.y, data.pose.position.z]
-        goal_ori_ = [data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w]
+        #goal_ori_ = [data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w]
+        q_start=np.quaternion(start_ori[3], start_ori[0], start_ori[1], start_ori[2])
+        q_goal=np.quaternion(data.pose.orientation.w, data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z)
+
         squared_dist = np.sum(np.subtract(start, goal_)**2, axis=0)
         dist = np.sqrt(squared_dist)
         interp_dist = 0.001  # [m]
@@ -201,23 +259,23 @@ class Panda():
         x = np.linspace(start[0], goal_[0], step_num)
         y = np.linspace(start[1], goal_[1], step_num)
         z = np.linspace(start[2], goal_[2], step_num)
-        rot_x= np.linspace(start_ori[0], goal_ori_[0], step_num)
-        rot_y= np.linspace(start_ori[1], goal_ori_[1], step_num)
-        rot_z= np.linspace(start_ori[2], goal_ori_[2], step_num)
-        rot_w= np.linspace(start_ori[3], goal_ori_[3], step_num)
+        quat=np.slerp_vectorized(q_start, q_goal, 0)
         position=[x[0],y[0],z[0]]
-        orientation=[rot_x[0], rot_y[0], rot_z[0], rot_w[0]]
+        orientation=[quat[1], quat[2], quat[3], quat[0]]
         self.set_attractor(position, orientation)
 
         # pos_stiff=[self.K_cart, self.K_cart, self.K_cart]
         # rot_stiff=[self.K_ori, self.K_ori, self.K_ori]
         # null_stiff=[0]
         self.set_stiffness(self.K_cart, self.K_cart, self.K_cart, self.K_ori, self.K_ori, self.K_ori, 0)
-
+        gripper_width=Float32()
+        gripper_width.data=self.recorded_gripper[0]
+        self.gripper_pub(gripper_width)
         # send attractors to controller
         for i in range(step_num):
             position=[x[i],y[i],z[i]]
-            orientation=[rot_x[i], rot_y[i], rot_z[i], rot_w[i]]
+            quat=np.slerp_vectorized(q_start, q_goal, i/step_num)
+            orientation=[quat[1], quat[2], quat[3], quat[0]]
             self.set_attractor(position,orientation)
             r.sleep()
 
@@ -237,10 +295,12 @@ class Panda():
         self.recorded_traj = self.cart_pos
         self.recorded_ori= self.cart_ori
         self.recorded_joint= self.joint_pos
+        self.recorded_gripper=self.gripper_width
         while not self.end:
 
             self.recorded_traj = np.c_[self.recorded_traj, self.cart_pos]
             self.recorded_ori= np.c_[self.recorded_ori, self.cart_ori]
             self.recorded_joint = np.c_[self.recorded_joint, self.joint_pos]
+            self.recorded_gripper= np.c_[self.recorded_gripper, self.gripper_width]
             r.sleep()
         

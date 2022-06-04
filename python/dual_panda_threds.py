@@ -72,7 +72,16 @@ class DualPanda():
             self.recorded_joint_dual = np.c_[self.recorded_joint_dual, np.r_[self.Panda_right.joint_pos, self.Panda_left.joint_pos]]
             self.recorded_gripper_dual= np.c_[self.recorded_gripper_dual, np.r_[self.Panda_right.gripper_width, self.Panda_left.gripper_width]]
             r.sleep()
-            
+
+        np.savez('recorded_demo', recorded_traj_dual=self.recorded_traj_dual , recorded_ori_dual=self.recorded_ori_dual, recorded_joint_dual=self.recorded_joint_dual, recorded_gripper_dual=self.recorded_gripper_dual)    
+    
+    def load_demo(self):
+        data = np.load('') #give a reasonable path
+        self.recorded_traj_dual = data['recorded_traj_dual']
+        self.recorded_ori_dual = data['recorded_ori_dual']
+        self.recorded_ori_dual = data['recorded_joint_dual']
+        self.recorded_gripper_dual = data['recorded_gripper_dual']      
+
     def execute_dual(self):
         r=rospy.Rate(self.rec_freq)
 
@@ -124,6 +133,7 @@ class DualPanda():
         goal.pose.orientation.w = self.recorded_ori_dual[7][0]
 
         self.Panda_left.goto_pub.publish(goal)
+
 class Panda():
 
     def __init__(self, arm_id=''):
@@ -304,4 +314,15 @@ class Panda():
             self.recorded_joint = np.c_[self.recorded_joint, self.joint_pos]
             self.recorded_gripper= np.c_[self.recorded_gripper, self.gripper_width]
             r.sleep()
+
+        np.savez('recorded_demo'+str(self.name), recorded_traj=self.recorded_traj , recorded_ori=self.recorded_ori, recorded_joint=self.recorded_joint, recorded_gripper=self.recorded_gripper)    
+
+    def load_demo(self):
+        data = np.load('') #give a reasonable path
+        self.recorded_traj = data['recorded_traj']
+        self.recorded_ori = data['recorded_ori']
+        self.recorded_ori = data['recorded_joint']
+        self.recorded_gripper = data['recorded_gripper']
+
+    
         

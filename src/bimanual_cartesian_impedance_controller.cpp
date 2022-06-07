@@ -273,14 +273,16 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   error_relative.head(3) << position - position_right; //todo change
   error_relative.tail(3).setZero();
 
-  if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-left_arm_data.position_d_relative_(0);}
-  else {error_relative(0)=error_relative(0)+left_arm_data.position_d_relative_(0);}
+  // if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-left_arm_data.position_d_relative_(0);}
+  // else {error_relative(0)=error_relative(0)+left_arm_data.position_d_relative_(0);}
 
-  if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-left_arm_data.position_d_relative_(1);}
-  else {error_relative(1)=error_relative(1)+left_arm_data.position_d_relative_(1);}
+  // if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-left_arm_data.position_d_relative_(1);}
+  // else {error_relative(1)=error_relative(1)+left_arm_data.position_d_relative_(1);}
 
-  if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-left_arm_data.position_d_relative_(2);}
-  else {error_relative(2)=error_relative(2)+left_arm_data.position_d_relative_(2);}
+  // if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-left_arm_data.position_d_relative_(2);}
+  // else {error_relative(2)=error_relative(2)+left_arm_data.position_d_relative_(2);}
+
+  error_relative.head(3)<< error_relative.head(3) -left_arm_data.position_d_relative_;
 
   // orientation error
   if (left_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
@@ -401,14 +403,17 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_left;
   error_relative.tail(3).setZero();
-  if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-right_arm_data.position_d_relative_(0);}
-  else {error_relative(0)=error_relative(0)+right_arm_data.position_d_relative_(0);}
 
-  if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-right_arm_data.position_d_relative_(1);}
-  else {error_relative(1)=error_relative(1)+right_arm_data.position_d_relative_(1);}
+  // if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-right_arm_data.position_d_relative_(0);}
+  // else {error_relative(0)=error_relative(0)+right_arm_data.position_d_relative_(0);}
 
-  if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-right_arm_data.position_d_relative_(2);}
-  else {error_relative(2)=error_relative(2)+right_arm_data.position_d_relative_(2);}
+  // if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-right_arm_data.position_d_relative_(1);}
+  // else {error_relative(1)=error_relative(1)+right_arm_data.position_d_relative_(1);}
+
+  // if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-right_arm_data.position_d_relative_(2);}
+  // else {error_relative(2)=error_relative(2)+right_arm_data.position_d_relative_(2);}
+
+  error_relative.head(3)<< error_relative.head(3) -right_arm_data.position_d_relative_;
 
   // orientation error
   if (right_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
@@ -605,10 +610,12 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
 
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative(
     const geometry_msgs::PoseStampedConstPtr& msg) {
+      //This function is receiving the distance from the distance respect the right arm and the left
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   auto&  left_arm_data = arms_data_.at(left_arm_id_);
   left_arm_data.position_d_relative_  << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
   right_arm_data.position_d_relative_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  left_arm_data.position_d_relative_=-left_arm_data.position_d_relative_;
 }
 
 void BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right(const sensor_msgs::JointState::ConstPtr& joint) {

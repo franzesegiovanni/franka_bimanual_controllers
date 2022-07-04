@@ -273,14 +273,6 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   error_relative.head(3) << position - position_right; //todo change
   error_relative.tail(3).setZero();
 
-  // if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-left_arm_data.position_d_relative_(0);}
-  // else {error_relative(0)=error_relative(0)+left_arm_data.position_d_relative_(0);}
-
-  // if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-left_arm_data.position_d_relative_(1);}
-  // else {error_relative(1)=error_relative(1)+left_arm_data.position_d_relative_(1);}
-
-  // if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-left_arm_data.position_d_relative_(2);}
-  // else {error_relative(2)=error_relative(2)+left_arm_data.position_d_relative_(2);}
 
   error_relative.head(3)<< error_relative.head(3) -left_arm_data.position_d_relative_;
 
@@ -313,7 +305,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   null_space_error(6)=(left_arm_data.q_d_nullspace_(6) - q(6));
   // Cartesian PD control with damping ratio = 1
   tau_task << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_ * error -
-                                      left_arm_data.cartesian_damping_ * (jacobian * dq));
+                                      left_arm_data.cartesian_damping_ * (jacobian * dq)); 
   // nullspace PD control with damping ratio = 1
   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
                     jacobian.transpose() * jacobian_transpose_pinv) *
@@ -338,7 +330,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
 
   tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq));
+                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
   tau_d << tau_task + tau_nullspace + coriolis + tau_joint_limit + tau_relative;
   // Saturate torque rate to avoid discontinuities
@@ -403,16 +395,6 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_left;
   error_relative.tail(3).setZero();
-
-  // if (error_relative(0) > 0) {error_relative(0)=error_relative(0)-right_arm_data.position_d_relative_(0);}
-  // else {error_relative(0)=error_relative(0)+right_arm_data.position_d_relative_(0);}
-
-  // if (error_relative(1) > 0) {error_relative(1)=error_relative(1)-right_arm_data.position_d_relative_(1);}
-  // else {error_relative(1)=error_relative(1)+right_arm_data.position_d_relative_(1);}
-
-  // if (error_relative(2) > 0) {error_relative(2)=error_relative(2)-right_arm_data.position_d_relative_(2);}
-  // else {error_relative(2)=error_relative(2)+right_arm_data.position_d_relative_(2);}
-
   error_relative.head(3)<< error_relative.head(3) -right_arm_data.position_d_relative_;
 
   // orientation error
@@ -469,7 +451,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
 
   tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq));
+                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
   tau_d << tau_task + tau_nullspace + coriolis+tau_joint_limit+tau_relative;
   // Saturate torque rate to avoid discontinuities

@@ -37,36 +37,46 @@ int main(int argc, char **argv)
 
   ros::NodeHandle gripper_left;
   ros::NodeHandle gripper_right;
-  ros::Rate loop_rate(200);
+  ros::Rate loop_rate(100);
 
   ros::Subscriber sub_left = gripper_left.subscribe("/panda_left_gripper", 0, Gripper_Left);
   ros::Subscriber sub_right = gripper_right.subscribe("/panda_right_gripper", 0, Gripper_Right);
-  ros::Publisher pub_move_left = gripper_left.advertise<franka_gripper::MoveActionGoal>("/panda_left_franka_gripper/move/goal", 10);
-  ros::Publisher pub_move_right = gripper_right.advertise<franka_gripper::MoveActionGoal>("/panda_right_franka_gripper/move/goal", 10);
+  ros::Publisher pub_move_left = gripper_left.advertise<franka_gripper::MoveActionGoal>("/panda_left_franka_gripper/move/goal", 1);
+  ros::Publisher pub_move_right = gripper_right.advertise<franka_gripper::MoveActionGoal>("/panda_right_franka_gripper/move/goal", 1);
 
   //ros::Publisher pub_stop = n.advertise<franka_gripper::StopAction>("/franka_gripper/stop", 1);
-  ros::Publisher pub_grasp_left = gripper_left.advertise<franka_gripper::GraspActionGoal>("/panda_left_franka_gripper/grasp/goal", 10);
-  ros::Publisher pub_grasp_right = gripper_right.advertise<franka_gripper::GraspActionGoal>("/panda_right_franka_gripper/grasp/goal", 10);
+  ros::Publisher pub_grasp_left = gripper_left.advertise<franka_gripper::GraspActionGoal>("/panda_left_franka_gripper/grasp/goal", 1);
+  ros::Publisher pub_grasp_right = gripper_right.advertise<franka_gripper::GraspActionGoal>("/panda_right_franka_gripper/grasp/goal", 1);
   franka_gripper::MoveActionGoal msg_move_left;
   franka_gripper::MoveActionGoal msg_move_right;
   franka_gripper::GraspActionGoal msg_grasp_left;
   franka_gripper::GraspActionGoal msg_grasp_right;
-  msg_move_left.goal.speed = 10;
-  msg_move_right.goal.speed = 10;
-  msg_grasp_left.goal.speed = 10;
-  msg_grasp_right.goal.speed = 10;
-
+  msg_move_left.goal.speed = 1;
+  msg_move_right.goal.speed = 1;
+  msg_grasp_left.goal.speed = 1;
+  msg_grasp_right.goal.speed = 1;
+  msg_grasp_right.goal.force=2;
+  msg_grasp_left.goal.force=2;
+  msg_grasp_left.goal.epsilon.inner=0.05;
+  msg_grasp_left.goal.epsilon.outer=0.05;
+  msg_grasp_right.goal.epsilon.inner=0.05;
+  msg_grasp_right.goal.epsilon.outer=0.05;
+  // msg_grasp_left.goal.epsilon=0.005;
+  // msg_grasp_right.goal.epsilon=0.005;
   //franka_gripper::StopActionGoal msg_stop;
   while (ros::ok())
   {
    if(flag_left==1)
    {
      if(width_left<=(width_old_left)) {
-     msg_move_left.goal.width = width_left;
-     pub_move_left.publish(msg_move_left);}
+    //  msg_move_left.goal.width = width_left;
+    //  pub_move_left.publish(msg_move_left);
+    msg_grasp_left.goal.width = width_left;
+    pub_grasp_left.publish(msg_grasp_left);
+    }
      else {
-       msg_move_left.goal.width = width_left;
-       pub_move_left.publish(msg_move_left);
+      //  msg_move_left.goal.width = width_left;
+      //  pub_move_left.publish(msg_move_left);
        msg_grasp_left.goal.width = width_left;
        pub_grasp_left.publish(msg_grasp_left);}
      width_old_left=width_left;
@@ -75,11 +85,15 @@ int main(int argc, char **argv)
     if(flag_right==1)
    {
      if(width_right<=(width_old_right)) {
-     msg_move_right.goal.width = width_right;
-     pub_move_right.publish(msg_move_right);}
+      msg_grasp_right.goal.width = width_right;
+      pub_grasp_right.publish(msg_grasp_right);
+    //  msg_move_right.goal.width = width_right;
+    //  pub_move_right.publish(msg_move_right);
+
+     }
      else {
-       msg_move_right.goal.width = width_right;
-       pub_move_right.publish(msg_move_right);
+      //  msg_move_right.goal.width = width_right;
+      //  pub_move_right.publish(msg_move_right);
        msg_grasp_right.goal.width = width_right;
        pub_grasp_right.publish(msg_grasp_right);}
      width_old_right=width_right;

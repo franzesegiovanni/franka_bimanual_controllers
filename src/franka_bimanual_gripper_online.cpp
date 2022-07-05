@@ -53,10 +53,10 @@ int main(int argc, char **argv)
   franka_gripper::GraspActionGoal msg_grasp_right;
   msg_move_left.goal.speed = 1;
   msg_move_right.goal.speed = 1;
-  msg_grasp_left.goal.speed = 1;
-  msg_grasp_right.goal.speed = 1;
-  msg_grasp_right.goal.force=2;
-  msg_grasp_left.goal.force=2;
+  msg_grasp_left.goal.speed = 0.03;
+  msg_grasp_right.goal.speed = 0.03;
+  msg_grasp_right.goal.force=0;
+  msg_grasp_left.goal.force=0;
   msg_grasp_left.goal.epsilon.inner=0.05;
   msg_grasp_left.goal.epsilon.outer=0.05;
   msg_grasp_right.goal.epsilon.inner=0.05;

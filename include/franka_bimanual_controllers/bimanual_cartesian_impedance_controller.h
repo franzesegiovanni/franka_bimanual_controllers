@@ -57,6 +57,7 @@ struct FrankaDataContainer {
 
   Eigen::Matrix<double, 6, 6> cartesian_stiffness_relative_;         ///< To track the target pose.
   Eigen::Matrix<double, 6, 6> cartesian_damping_relative_;
+  
 };
 
 /**
@@ -111,6 +112,7 @@ class BiManualCartesianImpedanceControl
   ///< Rate to trigger publishing the current pose of the centering frame.
   franka_hw::TriggerRate publish_rate_;
   Eigen::Matrix<float, 7, 1> stiff_;
+  double delta_lim;
   /**
    * Saturates torque commands to ensure feasibility.
    *

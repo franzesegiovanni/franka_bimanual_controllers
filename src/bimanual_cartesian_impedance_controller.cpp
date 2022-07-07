@@ -269,8 +269,12 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - left_arm_data.position_d_;
 
+  error[0]=std::max(-delta_lim, std::min(error[0], delta_lim));
+  error[1]=std::max(-delta_lim, std::min(error[1], delta_lim));
+  error[2]=std::max(-delta_lim, std::min(error[2], delta_lim));
+
   Eigen::Matrix<double, 6, 1> error_relative;
-  error_relative.head(3) << position - position_right; //todo change
+  error_relative.head(3) << position - position_right;
   error_relative.tail(3).setZero();
 
 
@@ -382,6 +386,12 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   // position error
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - right_arm_data.position_d_;
+
+  error[0]=std::max(-delta_lim, std::min(error[0], delta_lim));
+  error[1]=std::max(-delta_lim, std::min(error[1], delta_lim));
+  error[2]=std::max(-delta_lim, std::min(error[2], delta_lim));
+
+
   geometry_msgs::PoseStamped msg_right;
   msg_right.pose.position.x=position[0];
   msg_right.pose.position.y=position[1];
@@ -480,7 +490,7 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
     uint32_t /*level*/) {
 
    auto& left_arm_data = arms_data_.at(left_arm_id_);
-
+   delta_lim=config.delta_lim; 
    left_arm_data.cartesian_stiffness_.setIdentity();
    left_arm_data.cartesian_stiffness_(0,0)=config.panda_left_translational_stiffness_X;
    left_arm_data.cartesian_stiffness_(1,1)=config.panda_left_translational_stiffness_Y;

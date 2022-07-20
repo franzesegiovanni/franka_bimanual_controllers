@@ -276,9 +276,11 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_right;
   error_relative.tail(3).setZero();
-
-
   error_relative.head(3)<< error_relative.head(3) -left_arm_data.position_d_relative_;
+
+  error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
+  error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
+  error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
 
   // orientation error
   if (left_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
@@ -407,6 +409,10 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   error_relative.tail(3).setZero();
   error_relative.head(3)<< error_relative.head(3) -right_arm_data.position_d_relative_;
 
+  error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
+  error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
+  error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
+  
   // orientation error
   if (right_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
     orientation.coeffs() << -orientation.coeffs();

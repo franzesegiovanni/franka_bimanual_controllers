@@ -237,10 +237,13 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   std::array<double, 7> coriolis_array = left_arm_data.model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array =
       left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-
+  
+  std::array<double, 42> jacobian_array_right =
+      right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_right(jacobian_array_right.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_left.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_left.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
@@ -251,6 +254,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
   Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(robot_state_right.O_T_EE.data()));
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_right(robot_state_right.dq.data());
   Eigen::Vector3d position_right(transform_right.translation());
   // left_arm_data.position_other_arm_=position_right;
   // compute error to desired pose
@@ -336,7 +340,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
 
   tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq)); //TODO: MAKE THIS VELOCITY RELATIVE
+                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
   tau_d << tau_task + tau_nullspace + coriolis + tau_joint_limit + tau_relative;
   // Saturate torque rate to avoid discontinuities
@@ -369,11 +373,15 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   std::array<double, 42> jacobian_array =
       right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
 
+  std::array<double, 42> jacobian_array_left =
+      left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_left(jacobian_array_left.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
+
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
@@ -383,6 +391,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
   Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(robot_state_left.O_T_EE.data()));
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_left(robot_state_left.dq.data());
   Eigen::Vector3d position_left(transform_left.translation());
   // compute error to desired pose
   // position error
@@ -467,7 +476,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
 
   tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq)); //TODO: MAKE THIS VELOCITY RELATIVE
+                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
   tau_d << tau_task + tau_nullspace + coriolis+tau_joint_limit+tau_relative;
   // Saturate torque rate to avoid discontinuities

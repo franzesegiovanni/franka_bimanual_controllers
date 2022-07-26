@@ -10,6 +10,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "std_msgs/Float32MultiArray.h"
+#include <geometry_msgs/WrenchStamped.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_publisher.h>
@@ -57,7 +58,7 @@ struct FrankaDataContainer {
 
   Eigen::Matrix<double, 6, 6> cartesian_stiffness_relative_;         ///< To track the target pose.
   Eigen::Matrix<double, 6, 6> cartesian_damping_relative_;
-  
+  Eigen::Matrix<double, 6, 1> force_torque;
 };
 
 /**
@@ -188,6 +189,9 @@ class BiManualCartesianImpedanceControl
 
    ros::Publisher pub_right;
    ros::Publisher pub_left;
+
+   ros::Publisher pub_force_torque_right;
+   ros::Publisher pub_force_torque_left;
 
 };
 

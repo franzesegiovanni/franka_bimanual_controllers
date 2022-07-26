@@ -10,6 +10,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <franka/robot_state.h>
 #include <franka_bimanual_controllers/pseudo_inversion.h>
+#include <franka_bimanual_controllers/franka_model.h>
 #include <franka_hw/trigger_rate.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <pluginlib/class_list_macros.h>
@@ -84,6 +85,7 @@ bool BiManualCartesianImpedanceControl::initArm(
 
   arm_data.cartesian_stiffness_.setZero();
   arm_data.cartesian_damping_.setZero();
+  arm_data.force_torque.setZero();
 
   arms_data_.emplace(std::make_pair(arm_id, std::move(arm_data)));
 
@@ -153,6 +155,10 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
 
   pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("panda_left_cartesian_pose", 1);
 
+  pub_force_torque_right= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_right_ext",1);
+  pub_force_torque_left= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_left_ext",1);
+
+
   dynamic_reconfigure_compliance_param_node_ =
       ros::NodeHandle("dynamic_reconfigure_compliance_param_node");
 
@@ -202,6 +208,7 @@ void BiManualCartesianImpedanceControl::startingArmLeft() {
 
   // set nullspace target configuration to initial q
   left_arm_data.q_d_nullspace_ = q_initial;
+  
 }
 
 void BiManualCartesianImpedanceControl::startingArmRight() {
@@ -246,11 +253,12 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_right(jacobian_array_right.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_left.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_left.dq.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
-      robot_state_left.tau_J_d.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d( robot_state_left.tau_J_d.data());
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state_left.O_T_EE.data()));
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
+  Eigen::MatrixXd jacobian_transpose_pinv;
+  franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
 
   franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
   Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(robot_state_right.O_T_EE.data()));
@@ -269,6 +277,30 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   msg_left.pose.orientation.z=orientation.z();
   msg_left.pose.orientation.w=orientation.w();
   pub_left.publish(msg_left);
+
+
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_ext(robot_state_left.tau_ext_hat_filtered.data());
+  Eigen::Matrix<double, 7, 1>  tau_f;
+
+  // Compute the value of the friction
+  tau_f(0) =  FI_11/(1+exp(-FI_21*(dq(0)+FI_31))) - TAU_F_CONST_1;
+  tau_f(1) =  FI_12/(1+exp(-FI_22*(dq(1)+FI_32))) - TAU_F_CONST_2;
+  tau_f(2) =  FI_13/(1+exp(-FI_23*(dq(2)+FI_33))) - TAU_F_CONST_3;
+  tau_f(3) =  FI_14/(1+exp(-FI_24*(dq(3)+FI_34))) - TAU_F_CONST_4;
+  tau_f(4) =  FI_15/(1+exp(-FI_25*(dq(4)+FI_35))) - TAU_F_CONST_5;
+  tau_f(5) =  FI_16/(1+exp(-FI_26*(dq(5)+FI_36))) - TAU_F_CONST_6;
+  tau_f(6) =  FI_17/(1+exp(-FI_27*(dq(6)+FI_37))) - TAU_F_CONST_7;
+
+  float iCutOffFrequency=10.0;
+  left_arm_data.force_torque+=(-jacobian_transpose_pinv*(tau_ext-tau_f)-left_arm_data.force_torque)*(1-exp(-0.001 * 2.0 * M_PI * iCutOffFrequency));
+  geometry_msgs::WrenchStamped force_torque_msg;
+  force_torque_msg.wrench.force.x=left_arm_data.force_torque[0];
+  force_torque_msg.wrench.force.y=left_arm_data.force_torque[1];
+  force_torque_msg.wrench.force.z=left_arm_data.force_torque[2];
+  force_torque_msg.wrench.torque.x=left_arm_data.force_torque[3];
+  force_torque_msg.wrench.torque.y=left_arm_data.force_torque[4];
+  force_torque_msg.wrench.torque.z=left_arm_data.force_torque[5];
+  pub_force_torque_left.publish(force_torque_msg);
 
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - left_arm_data.position_d_;
@@ -303,8 +335,6 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   // pseudoinverse for nullspace handling
   // kinematic pseuoinverse
-  Eigen::MatrixXd jacobian_transpose_pinv;
-  franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   null_space_error.setZero();
   null_space_error(0)=(left_arm_data.q_d_nullspace_(0) - q(0));
   null_space_error(1)=(left_arm_data.q_d_nullspace_(1) - q(1));
@@ -367,7 +397,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   // get state variables
-  franka::RobotState robot_state = right_arm_data.state_handle_->getRobotState();
+  franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
   std::array<double, 49> inertia_array = right_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = right_arm_data.model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array =
@@ -379,15 +409,16 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_left(jacobian_array_left.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_right.q.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_right.dq.data());
 
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
-      robot_state.tau_J_d.data());
-  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+      robot_state_right.tau_J_d.data());
+  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state_right.O_T_EE.data()));
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
-
+  Eigen::MatrixXd jacobian_transpose_pinv;
+  franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
 
   franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
   Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(robot_state_left.O_T_EE.data()));
@@ -413,6 +444,30 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   msg_right.pose.orientation.z=orientation.z();
   msg_right.pose.orientation.w=orientation.w();
   pub_right.publish(msg_right);
+
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_ext(robot_state_right.tau_ext_hat_filtered.data());
+  Eigen::Matrix<double, 7, 1>  tau_f;
+
+  // Compute the value of the friction
+  tau_f(0) =  FI_11/(1+exp(-FI_21*(dq(0)+FI_31))) - TAU_F_CONST_1;
+  tau_f(1) =  FI_12/(1+exp(-FI_22*(dq(1)+FI_32))) - TAU_F_CONST_2;
+  tau_f(2) =  FI_13/(1+exp(-FI_23*(dq(2)+FI_33))) - TAU_F_CONST_3;
+  tau_f(3) =  FI_14/(1+exp(-FI_24*(dq(3)+FI_34))) - TAU_F_CONST_4;
+  tau_f(4) =  FI_15/(1+exp(-FI_25*(dq(4)+FI_35))) - TAU_F_CONST_5;
+  tau_f(5) =  FI_16/(1+exp(-FI_26*(dq(5)+FI_36))) - TAU_F_CONST_6;
+  tau_f(6) =  FI_17/(1+exp(-FI_27*(dq(6)+FI_37))) - TAU_F_CONST_7;
+
+  float iCutOffFrequency=10.0;
+  right_arm_data.force_torque+=(-jacobian_transpose_pinv*(tau_ext-tau_f)-right_arm_data.force_torque)*(1-exp(-0.001 * 2.0 * M_PI * iCutOffFrequency));
+  geometry_msgs::WrenchStamped force_torque_msg;
+  force_torque_msg.wrench.force.x=right_arm_data.force_torque[0];
+  force_torque_msg.wrench.force.y=right_arm_data.force_torque[1];
+  force_torque_msg.wrench.force.z=right_arm_data.force_torque[2];
+  force_torque_msg.wrench.torque.x=right_arm_data.force_torque[3];
+  force_torque_msg.wrench.torque.y=right_arm_data.force_torque[4];
+  force_torque_msg.wrench.torque.z=right_arm_data.force_torque[5];
+  pub_force_torque_right.publish(force_torque_msg);
+
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_left;
   error_relative.tail(3).setZero();
@@ -437,10 +492,6 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   // allocate variables
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7);
 
-  // pseudoinverse for nullspace handling
-  // kinematic pseuoinverse
-  Eigen::MatrixXd jacobian_transpose_pinv;
-  franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   null_space_error.setZero();
   null_space_error(0)=(right_arm_data.q_d_nullspace_(0) - q(0));
   null_space_error(1)=(right_arm_data.q_d_nullspace_(1) - q(1));
@@ -542,8 +593,9 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   left_arm_data.cartesian_damping_relative_.setIdentity();
   left_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
       << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  left_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
           << 0.0 * Eigen::Matrix3d::Identity();
+          
 
 
 
@@ -587,7 +639,7 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.cartesian_damping_relative_.setIdentity();
   right_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
       << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  right_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
           << 0.0 * Eigen::Matrix3d::Identity();
 
 }

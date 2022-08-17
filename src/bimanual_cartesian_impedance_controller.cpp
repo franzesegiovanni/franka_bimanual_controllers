@@ -302,12 +302,12 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   force_torque_msg.wrench.torque.z=left_arm_data.force_torque[5];
   pub_force_torque_left.publish(force_torque_msg);
 
-  Eigen::Matrix<double, 6, 1> error;
-  error.head(3) << position - left_arm_data.position_d_;
+  Eigen::Matrix<double, 6, 1> error_left;
+  error_left.head(3) << position - left_arm_data.position_d_;
 
-  error[0]=std::max(-delta_lim, std::min(error[0], delta_lim));
-  error[1]=std::max(-delta_lim, std::min(error[1], delta_lim));
-  error[2]=std::max(-delta_lim, std::min(error[2], delta_lim));
+  error_left[0]=std::max(-delta_lim, std::min(error_left[0], delta_lim));
+  error_left[1]=std::max(-delta_lim, std::min(error_left[1], delta_lim));
+  error_left[2]=std::max(-delta_lim, std::min(error_left[2], delta_lim));
 
   Eigen::Matrix<double, 6, 1> error_relative;
   error_relative.head(3) << position - position_right;
@@ -327,12 +327,24 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   // convert to axis angle
   Eigen::AngleAxisd error_quaternion_angle_axis(error_quaternion);
   // compute "orientation error"
-  error.tail(3) << error_quaternion_angle_axis.axis() * error_quaternion_angle_axis.angle();
+  error_left.tail(3) << error_quaternion_angle_axis.axis() * error_quaternion_angle_axis.angle();
+
+
+  error_left[3]=std::max(-delta_lim*3, std::min(error_left[3], delta_lim*3));
+  error_left[4]=std::max(-delta_lim*3, std::min(error_left[4], delta_lim*3));
+  error_left[5]=std::max(-delta_lim*3, std::min(error_left[5], delta_lim*3));
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_left(7), tau_d_left(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
 
+  tau_task.setZero();
+  tau_d_left.setZero();
+  tau_nullspace_left.setZero();
+  tau_joint_limit.setZero();
+  tau_relative.setZero();
+  tau_joint_limit_ns.setZero();
+  tau_joint_limit_ns_act.setZero();
   // pseudoinverse for nullspace handling
   // kinematic pseuoinverse
   null_space_error.setZero();
@@ -344,10 +356,10 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   null_space_error(5)=(left_arm_data.q_d_nullspace_(5) - q(5));
   null_space_error(6)=(left_arm_data.q_d_nullspace_(6) - q(6));
   // Cartesian PD control with damping ratio = 1
-  tau_task << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_ * error -
+  tau_task << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_ * error_left -
                                       left_arm_data.cartesian_damping_ * (jacobian * dq)); 
   // nullspace PD control with damping ratio = 1
-  tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
+  tau_nullspace_left << (Eigen::MatrixXd::Identity(7, 7) -
                     jacobian.transpose() * jacobian_transpose_pinv) *
                        (left_arm_data.nullspace_stiffness_ * null_space_error -
                         (2.0 * sqrt(left_arm_data.nullspace_stiffness_)) * dq);
@@ -405,11 +417,12 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
                                       left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
-  tau_d << tau_task + tau_nullspace + coriolis + tau_joint_limit + tau_relative + tau_joint_limit_ns_act ;
+  //tau_d << tau_task + tau_nullspace_left + coriolis + tau_joint_limit + tau_relative + tau_joint_limit_ns_act ;
+  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit+ tau_relative + tau_joint_limit_ns_act ;
   // Saturate torque rate to avoid discontinuities
-  tau_d << saturateTorqueRateLeft(tau_d, tau_J_d);
+  tau_d_left << saturateTorqueRateLeft(tau_d_left, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {
-    left_arm_data.joint_handles_[i].setCommand(tau_d(i));
+    left_arm_data.joint_handles_[i].setCommand(tau_d_left(i));
   }
 }
 
@@ -459,12 +472,12 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   Eigen::Vector3d position_left(transform_left.translation());
   // compute error to desired pose
   // position error
-  Eigen::Matrix<double, 6, 1> error;
-  error.head(3) << position - right_arm_data.position_d_;
+  Eigen::Matrix<double, 6, 1> error_right;
+  error_right.head(3) << position - right_arm_data.position_d_;
 
-  error[0]=std::max(-delta_lim, std::min(error[0], delta_lim));
-  error[1]=std::max(-delta_lim, std::min(error[1], delta_lim));
-  error[2]=std::max(-delta_lim, std::min(error[2], delta_lim));
+  error_right[0]=std::max(-delta_lim, std::min(error_right[0], delta_lim));
+  error_right[1]=std::max(-delta_lim, std::min(error_right[1], delta_lim));
+  error_right[2]=std::max(-delta_lim, std::min(error_right[2], delta_lim));
 
 
   geometry_msgs::PoseStamped msg_right;
@@ -519,11 +532,15 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   // convert to axis angle
   Eigen::AngleAxisd error_quaternion_angle_axis(error_quaternion);
   // compute "orientation error"
-  error.tail(3) << error_quaternion_angle_axis.axis() * error_quaternion_angle_axis.angle();
+  error_right.tail(3) << error_quaternion_angle_axis.axis() * error_quaternion_angle_axis.angle();
+
+  error_right[3]=std::max(-delta_lim*3, std::min(error_right[3], delta_lim*3));
+  error_right[4]=std::max(-delta_lim*3, std::min(error_right[4], delta_lim*3));
+  error_right[5]=std::max(-delta_lim*3, std::min(error_right[5], delta_lim*3));
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_right(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
 
   null_space_error.setZero();
   null_space_error(0)=(right_arm_data.q_d_nullspace_(0) - q(0));
@@ -534,10 +551,10 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   null_space_error(5)=(right_arm_data.q_d_nullspace_(5) - q(5));
   null_space_error(6)=(right_arm_data.q_d_nullspace_(6) - q(6));
   // Cartesian PD control with damping ratio = 1
-  tau_task << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_ * error -
+  tau_task << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_ * error_right -
                                       right_arm_data.cartesian_damping_ * (jacobian * dq));
   // nullspace PD control with damping ratio = 1
-  tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
+  tau_nullspace_right << (Eigen::MatrixXd::Identity(7, 7) -
                     jacobian.transpose() * jacobian_transpose_pinv) *
                        (right_arm_data.nullspace_stiffness_ * null_space_error -
                         (2.0 * sqrt(right_arm_data.nullspace_stiffness_)) * dq);
@@ -596,7 +613,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
                                       right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
-  tau_d << tau_task + tau_nullspace + coriolis+tau_joint_limit+tau_relative;
+  tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit+tau_relative;
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRateRight(tau_d, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {

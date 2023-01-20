@@ -31,7 +31,6 @@ source /opt/ros/<ros-distro>/setup.sh
 catkin_init_workspace src
 git clone --recursive https://github.com/frankaemika/franka_ros src/franka_ros
 rosdep install --from-paths src --ignore-src --rosdistro <ros-distro> -y --skip-keys libfranka
-source devel/setup.sh
 ```
 - Finally, install the controllers inside the folder "franka_ros" and build the code:
 ```
@@ -40,6 +39,7 @@ git clone https://github.com/franzesegiovanni/franka_bimanual_controllers.git
 cd ../..
 source /opt/ros/<ros-distro>/setup.bash
 catkin_make -DMAKE_BUILD_TYPE=Release -DFranka_DIR:PATH=~/libfranka/build
+source devel/setup.sh
 ```
 
 To start the controller use this command

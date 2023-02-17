@@ -6,6 +6,7 @@ This code is part of TERI (TEaching Robots Interactively) project
 """
 #%%
 # !/usr/bin/env python
+import os
 import queue
 import matplotlib
 import rospy
@@ -433,6 +434,9 @@ class DualPanda:
         """
         Function to save the last bimanual demonstration to a file.
         """
+        if not os.path.exists(str(pathlib.Path().resolve()) + '/data'):
+            os.mkdir(str(pathlib.Path().resolve()) + '/data')
+
         np.savez(str(pathlib.Path().resolve()) + '/data/' + 'dual_' + str(data) + '.npz',
                  recorded_traj_dual=self.recorded_traj_dual,
                  recorded_ori_dual=self.recorded_ori_dual,
@@ -860,6 +864,9 @@ class Panda:
         self.recording = False
 
     def save(self, data='last'):
+        if not os.path.exists(str(pathlib.Path().resolve()) + '/data'):
+            os.mkdir(str(pathlib.Path().resolve()) + '/data')
+
         np.savez(str(pathlib.Path().resolve()) + '/data/' + str(self.name) + '_' + str(data) + '.npz',
                  recorded_traj=self.recorded_traj,
                  recorded_ori=self.recorded_ori,

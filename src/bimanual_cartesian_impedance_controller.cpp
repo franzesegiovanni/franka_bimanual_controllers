@@ -366,20 +366,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   //Avoid joint limits
   tau_joint_limit.setZero();
-  // if (q(0)>2.85)     { tau_joint_limit(0)=-5; }
-  // if (q(0)<-2.85)    { tau_joint_limit(0)=+5; }
-  // if (q(1)>1.7)      { tau_joint_limit(1)=-5; }
-  // if (q(1)<-1.7)     { tau_joint_limit(1)=+5; }
-  // if (q(2)>2.85)     { tau_joint_limit(2)=-5; }
-  // if (q(2)<-2.85)    { tau_joint_limit(2)=+5; }
-  // if (q(3)>-0.1)     { tau_joint_limit(3)=-5; }
-  // if (q(3)<-3.0)     { tau_joint_limit(3)=+5; }
-  // if (q(4)>2.85)     { tau_joint_limit(4)=-5; }
-  // if (q(4)<-2.85)    { tau_joint_limit(4)=+5; }
-  // if (q(5)>3.7)      { tau_joint_limit(5)=-5; }
-  // if (q(5)<-0.1)     { tau_joint_limit(5)=+5; }
-  // if (q(6)>2.8)      { tau_joint_limit(6)=-5; }
-  // if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
+
   if (q(0)>2.85)      { tau_joint_limit(0)=-2*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
   if (q(0)<-2.85)     { tau_joint_limit(0)=+2*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
   if (q(1)>1.7)       { tau_joint_limit(1)=-2*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
@@ -560,22 +547,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
                         (2.0 * sqrt(right_arm_data.nullspace_stiffness_)) * dq);
 
   //Avoid joint limits
-  tau_joint_limit.setZero();
-  // if (q(0)>2.85)     { tau_joint_limit(0)=-5; }
-  // if (q(0)<-2.85)    { tau_joint_limit(0)=+5; }
-  // if (q(1)>1.7)      { tau_joint_limit(1)=-5; }
-  // if (q(1)<-1.7)     { tau_joint_limit(1)=+5; }
-  // if (q(2)>2.85)     { tau_joint_limit(2)=-5; }
-  // if (q(2)<-2.85)    { tau_joint_limit(2)=+5; }
-  // if (q(3)>-0.1)     { tau_joint_limit(3)=-5; }
-  // if (q(3)<-3.0)     { tau_joint_limit(3)=+5; }
-  // if (q(4)>2.85)     { tau_joint_limit(4)=-5; }
-  // if (q(4)<-2.85)    { tau_joint_limit(4)=+5; }
-  // if (q(5)>3.7)      { tau_joint_limit(5)=-5; }
-  // if (q(5)<-0.1)     { tau_joint_limit(5)=+5; }
-  // if (q(6)>2.8)      { tau_joint_limit(6)=-5; }
-  // if (q(6)<-2.8)     { tau_joint_limit(6)=+5; }
-
+  tau_joint_limit.setZero(); // the comment on the right side is the joint limit reported by 
   if (q(0)>2.85)      { tau_joint_limit(0)=-2*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
   if (q(0)<-2.85)     { tau_joint_limit(0)=+2*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
   if (q(1)>1.7)       { tau_joint_limit(1)=-2*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
@@ -735,8 +707,6 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left(
   Eigen::Quaterniond last_orientation_d_(left_arm_data.orientation_d_);
   left_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
-  // if (last_orientation_d_.coeffs().dot(left_arm_data.orientation_d_.coeffs()) < 0.0) {
-  //   left_arm_data.orientation_d_.coeffs() << -left_arm_data.orientation_d_.coeffs();}
 }
 
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
@@ -746,8 +716,6 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
   Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_);
   right_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
-  // if (last_orientation_d_.coeffs().dot(right_arm_data.orientation_d_.coeffs()) < 0.0) {
-  //   right_arm_data.orientation_d_.coeffs() << -right_arm_data.orientation_d_.coeffs();}
 }
 
 

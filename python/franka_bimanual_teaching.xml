@@ -1,7 +1,0 @@
-<library path="lib/libfranka_bimanual_controllers">
-  <class name="franka_bimanual_controllers/BiManualCartesianImpedanceControl" type="franka_bimanual_controllers::BiManualCartesianImpedanceControl" base_class_type="controller_interface::ControllerBase">
-      <description>
-          A controller that renders Cartesian impedance based tracking of separate target poses for 2 panda arms.
-      </description>
-  </class>
-</library>

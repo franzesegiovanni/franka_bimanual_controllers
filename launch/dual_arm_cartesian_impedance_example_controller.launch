@@ -1,14 +1,13 @@
 <?xml version="1.0" ?>
 <launch>
-  <!--Be sure to pass the IPs of your pandas like robot_ips:={panda_1/robot_ip: <my_ip_1>, panda_2/robot_ip: <my_ip_2>}   -->
-  <arg name="robot_ips" />
-  <arg name="panda_right"/>
-  <arg name="panda_left"/>
+  <arg name="robot_right_ip"/>
+  <arg name="robot_left_ip"/>
   <arg name="robot_id" default="panda_dual" />
-  <arg name="robot_id_right" default="panda_right" />
-  <arg name="robot_id_left" default="panda_left" />
   <arg name="rviz" default="true" />
   <arg name="rqt" default="true" />
+  <arg name="robot_id_right" value="panda_right" />
+  <arg name="robot_id_left" value="panda_left" />
+  <arg name="robot_ips" value="{panda_right/robot_ip: $(arg robot_right_ip),panda_left/robot_ip: $(arg robot_left_ip)}" />
 
   <include file="$(find franka_bimanual_controllers)/launch/franka_combined_control.launch" >
     <arg name="robot_id" value="$(arg robot_id)" />
@@ -18,7 +17,7 @@
   <group ns="$(arg robot_id)">
     <rosparam command="load" file="$(find franka_bimanual_controllers)/config/franka_bimanual_controllers.yaml" />
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"  args="bimanual_cartesian_impedance_controller"/>
-    <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find franka_bimanual_controllers)/launch/rviz/franka_dual_description_with_marker.rviz" if="$(arg rviz)"/>
+    <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find franka_bimanual_controllers)/launch/rviz/franka_dual_description.rviz" if="$(arg rviz)"/>
   </group>
    <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" required="false" /> 
 
@@ -27,14 +26,14 @@
   <arg name="joint_names_right" default="[$(arg robot_id_right)_finger_joint1, $(arg robot_id_right)_finger_joint2]" />
   <arg name="joint_names_left" default="[$(arg robot_id_left)_finger_joint1, $(arg robot_id_left)_finger_joint2]" />
   <node name="$(arg robot_id_right)_franka_gripper" pkg="franka_gripper" type="franka_gripper_node" output="screen">
-    <param name="robot_ip" value="$(arg panda_right)"/>
+    <param name="robot_ip" value="$(arg robot_right_ip)"/>
     <param name="stop_at_shutdown" value="$(arg stop_at_shutdown)" />
     <rosparam command="load" file="$(find franka_gripper)/config/franka_gripper_node.yaml" />
     <rosparam param="joint_names" subst_value="true">$(arg joint_names_right)</rosparam>
   </node>
 
   <node name="$(arg robot_id_left)_franka_gripper" pkg="franka_gripper" type="franka_gripper_node" output="screen">
-    <param name="robot_ip" value="$(arg panda_left)"/>
+    <param name="robot_ip" value="$(arg robot_left_ip)"/>
     <param name="stop_at_shutdown" value="$(arg stop_at_shutdown)" />
     <rosparam command="load" file="$(find franka_gripper)/config/franka_gripper_node.yaml" />
     <rosparam param="joint_names" subst_value="true">$(arg joint_names_left)</rosparam>

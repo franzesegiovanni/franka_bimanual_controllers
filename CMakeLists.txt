@@ -92,14 +92,6 @@ target_link_libraries(bilateral_control
    franka_bimanual_controllers
 )
 
-add_executable(franka_bimanual_gripper_online
-  src/franka_bimanual_gripper_online.cpp
-)
-
-target_link_libraries(franka_bimanual_gripper_online
-   ${catkin_LIBRARIES}
-   franka_bimanual_controllers
-)
 ## Installation
 install(TARGETS franka_bimanual_controllers
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -117,10 +109,6 @@ install(DIRECTORY config
 )
 install(FILES franka_bimanual_controllers_plugin.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-catkin_install_python(
-  PROGRAMS scripts/interactive_marker.py scripts/move_to_start.py scripts/dual_arm_interactive_marker.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Tools

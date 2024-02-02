@@ -1,38 +1,18 @@
 # Franka Bimaual Impedance Controller
+This repository was developed for the paper: 
+Interactive Imitation Learning of Bimanual Movement Primitives, 
 
-For more info: https://frankaemika.github.io/docs/installation_linux.html
-- Open a terminal pressing ctrl+alt+t
+Giovanni Franzese, Leandro de Souza Rosa, Tim Verburg, Luka Peternel, Jens Kober. 
 
--In case you already have some versions of libfranka installed, remove them to avoid conflicts with:
+Published in IEEE/ASME Transactions on Mechatronics. 
+
+If this code is useful in your research, please cite us:
+
 ```
-sudo apt remove "*libfranka*"
-sudo apt autoremove
-```
-Type the following commands to generate and build libfranka
-```
-cd
-sudo apt install build-essential cmake git libpoco-dev libeigen3-dev
-git clone --recursive https://github.com/frankaemika/libfranka
-cd libfranka
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build .
+Franzese, G., de Souza Rosa, L., Verburg, T., Peternel, L. and Kober, J., 2023. Interactive imitation learning of bimanual movement primitives. IEEE/ASME Transactions on Mechatronics.
 ```
 
-This last comand may take several minutes. 
-
-Now create a workspace (here called catkin_ws) and install franka_ros in it
-```
-cd
-mkdir -p catkin_ws/src
-cd catkin_ws
-source /opt/ros/<ros-distro>/setup.sh
-catkin_init_workspace src
-git clone --recursive https://github.com/frankaemika/franka_ros src/franka_ros
-rosdep install --from-paths src --ignore-src --rosdistro <ros-distro> -y --skip-keys libfranka
-```
-- Finally, install the controllers inside the folder "franka_ros" and build the code:
+- Install the controllers inside the folder "franka_ros" and build the code:
 ```
 cd src/franka_ros
 git clone https://github.com/franzesegiovanni/franka_bimanual_controllers.git
@@ -45,9 +25,9 @@ source devel/setup.sh
 To start the controller use this command
 
 ```
-roslaunch franka_bimanual_controllers dual_arm_cartesian_impedance_example_controller.launch robot_ips:="{panda_right/robot_ip: 172.16.0.2,panda_left/robot_ip: 172.16.0.3}" panda_right:=172.16.0.2 panda_left:=172.16.0.3
+roslaunch franka_bimanual_controllers dual_arm_cartesian_impedance_example_controller.launch robot_right_ip:=<ip_robot_right> robot_left_ip:=<ip_robot_left>
+
 ``` 
-Warning: you must change the ip address with the ones of your setup!
 
 You can now read the topic of each of the robot. For example: 
 ```
@@ -57,10 +37,8 @@ or
 ```
 rostopic echo /panda_left_franka_gripper/joint_states
 ```
-# How to run a simple learning from demonstration using python 
-In a new terminal run 
-```
-python3 python/dual_server.py 
-```
-Then run the cells of python/main.py in an interactive way, one by one. 
-Check this to learn how to do it with vscode: https://code.visualstudio.com/docs/python/jupyter-support-py 
+
+For python codes, please refer to https://github.com/franzesegiovanni/SIMPLe/tree/main/SIMPLe_bimanual
+
+
+For any problems or questions, feel free to open an issue in the repo or send an email to g.franzese@tudelft.nl

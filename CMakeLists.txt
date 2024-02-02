@@ -33,7 +33,6 @@ generate_messages()
 
 generate_dynamic_reconfigure_options(
   cfg/dual_arm_compliance_param.cfg
-  cfg/dualteaching.cfg
 )
 
 catkin_package(

@@ -193,6 +193,11 @@ class BiManualCartesianImpedanceControl
    ros::Publisher pub_force_torque_right;
    ros::Publisher pub_force_torque_left;
 
+   double joint_limits[7][2];
+
+   double calculateTauJointLimit(double q_value, double threshold, double magnitude, double upper_bound, double lower_bound);
+
+
 };
 
 }  // namespace franka_bimanual_controllers

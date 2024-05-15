@@ -80,8 +80,6 @@ bool BiManualCartesianImpedanceControl::initArm(
 
   arm_data.position_d_.setZero();
   arm_data.orientation_d_.coeffs() << 0.0, 0.0, 0.0, 1.0;
-  //arm_data.position_d_target_.setZero();
-  //arm_data.orientation_d_target_.coeffs() << 0.0, 0.0, 0.0, 1.0;
 
   arm_data.cartesian_stiffness_.setZero();
   arm_data.cartesian_damping_.setZero();
@@ -169,6 +167,25 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   dynamic_server_compliance_param_->setCallback(boost::bind(
       &BiManualCartesianImpedanceControl::complianceParamCallback, this, _1, _2));
 
+        // Define variables to store parameter values
+  const std::string limit_types[2] = {"lower", "upper"};
+
+  // Read parameters from the parameter server
+  for (int i = 0; i < 7; ++i) {
+      for (const std::string& limit_type : limit_types) {
+          std::string param_name = "/joint" + std::to_string(i + 1) + "/limit/" + limit_type;
+          if (!node_handle.getParam(param_name, joint_limits[i][limit_type == "lower" ? 0 : 1])) {
+              ROS_ERROR("Failed to retrieve parameter: %s", param_name.c_str());
+              return 1;
+          }
+      }
+  }
+
+    // Stream the parameter values
+    ROS_INFO("Joint limits:");
+    for (int i = 0; i < 7; ++i) {
+        ROS_INFO("Joint %d: lower=%.4f, upper=%.4f", i + 1, joint_limits[i][0], joint_limits[i][1]);
+    }
 
    return left_success && right_success;
 }
@@ -336,15 +353,13 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace_left(7), tau_d_left(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_left(7), tau_d_left(7), tau_joint_limit(7), null_space_error(7), tau_relative(7);
 
   tau_task.setZero();
   tau_d_left.setZero();
   tau_nullspace_left.setZero();
   tau_joint_limit.setZero();
   tau_relative.setZero();
-  tau_joint_limit_ns.setZero();
-  tau_joint_limit_ns_act.setZero();
   // pseudoinverse for nullspace handling
   // kinematic pseuoinverse
   null_space_error.setZero();
@@ -367,45 +382,25 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   //Avoid joint limits
   tau_joint_limit.setZero();
 
-  if (q(0)>2.85)      { tau_joint_limit(0)=-2*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(0)<-2.85)     { tau_joint_limit(0)=+2*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
-  if (q(1)>1.7)       { tau_joint_limit(1)=-2*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
-  if (q(1)<-1.7)      { tau_joint_limit(1)=+2*(std::exp((-q(1)-1.7)/(1.7628-1.7))-1); }//1.7628
-  if (q(2)>2.85)      { tau_joint_limit(2)=-2*(std::exp((q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(2)<-2.85)     { tau_joint_limit(2)=+2*(std::exp((-q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(3)>-0.1)      { tau_joint_limit(3)=-2*(std::exp((q(3)+0.1)/(0.1-0.0698))-1); } //-0.0698
-  if (q(3)<-3.0)      { tau_joint_limit(3)=2*(std::exp((-q(3)-3.0)/(3.0718-3.00))-1); } //-3.0718
-  if (q(4)>2.85)      { tau_joint_limit(4)=-2*(std::exp((q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(4)<-2.85)     { tau_joint_limit(4)=+2*(std::exp((-q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(5)>3.7)       { tau_joint_limit(5)=-2*(std::exp((q(5)-3.7)/(3.7525-3.7))-1); } //3.7525
-  if (q(5)<0.05)      { tau_joint_limit(5)=2*(std::exp((std::abs(q(5)-0.05)/(0.05+0.0175)))-1); } //-0.0175
-  if (q(6)>2.7)      { tau_joint_limit(6)=-5*(std::exp((q(6)-2.7)/(2.8973-2.7))-1); }  //2.8973
-  if (q(6)<-2.7)     { tau_joint_limit(6)=+5*(std::exp((-q(6)-2.7)/(2.8973-2.7))-1); } //2.8973
+  // (double q_value, double threshold, double magnitude, double upper_bound, double lower_bound) 
+  tau_joint_limit(0) = calculateTauJointLimit(q(0), 0.05, 4.0, joint_limits[0][1], joint_limits[0][0]); 
+  tau_joint_limit(1) = calculateTauJointLimit(q(1), 0.05, 4.0, joint_limits[1][1], joint_limits[1][0]);
+  tau_joint_limit(2) = calculateTauJointLimit(q(2), 0.05, 4.0, joint_limits[2][1], joint_limits[2][0]);
+  tau_joint_limit(3) = calculateTauJointLimit(q(3), 0.05, 4.0, joint_limits[3][1], joint_limits[3][0]);
+  tau_joint_limit(4) = calculateTauJointLimit(q(4), 0.05, 4.0, joint_limits[4][1], joint_limits[4][0]);
+  tau_joint_limit(5) = calculateTauJointLimit(q(5), 0.05, 4.0, joint_limits[5][1], joint_limits[5][0]);
+  tau_joint_limit(6) = calculateTauJointLimit(q(6), 0.05, 4.0, joint_limits[6][1], joint_limits[6][0]);
 
 
 
-  if (q(0)>2.85)      { tau_joint_limit_ns(0)=-5*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(0)<-2.85)     { tau_joint_limit_ns(0)=+5*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
-  if (q(1)>1.7)       { tau_joint_limit_ns(1)=-5*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
-  if (q(1)<-1.7)      { tau_joint_limit_ns(1)=+5*(std::exp((-q(1)-1.7)/(1.7628-1.7))-1); }//1.7628
-  if (q(2)>2.85)      { tau_joint_limit_ns(2)=-5*(std::exp((q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(2)<-2.85)     { tau_joint_limit_ns(2)=+5*(std::exp((-q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(3)>-0.1)      { tau_joint_limit_ns(3)=-5*(std::exp((q(3)+0.1)/(0.1-0.0698))-1); } //-0.0698
-  if (q(3)<-3.0)      { tau_joint_limit_ns(3)=5*(std::exp((-q(3)-3.0)/(3.0718-3.00))-1); } //-3.0718
-  if (q(4)>2.85)      { tau_joint_limit_ns(4)=-5*(std::exp((q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(4)<-2.85)     { tau_joint_limit_ns(4)=+5*(std::exp((-q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(5)>3.7)       { tau_joint_limit_ns(5)=-5*(std::exp((q(5)-3.7)/(3.7525-3.7))-1); } //3.7525
-  if (q(5)<0.05)      { tau_joint_limit_ns(5)=5*(std::exp((std::abs(q(5)-0.05)/(0.05+0.0175)))-1); } //-0.0175
-  if (q(6)>2.7)      { tau_joint_limit_ns(6)=-10*(std::exp((q(6)-2.7)/(2.8973-2.7))-1); }  //2.8973
-  if (q(6)<-2.7)     { tau_joint_limit_ns(6)=+10*(std::exp((-q(6)-2.7)/(2.8973-2.7))-1); } //2.8973
-  // Desired torque
-   tau_joint_limit_ns_act << 5 * (Eigen::MatrixXd::Identity(7, 7) -
-                    jacobian.transpose() * jacobian_transpose_pinv) * tau_joint_limit_ns ;
+for (int i = 0; i < 7; ++i) {
+    tau_joint_limit(i) = std::max(std::min(tau_joint_limit(i), 5.0), -5.0);
+}
+
   tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
                                       left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right)); //TODO: MAKE THIS VELOCITY RELATIVE
   // Desired torque
-  //tau_d << tau_task + tau_nullspace_left + coriolis + tau_joint_limit + tau_relative + tau_joint_limit_ns_act ;
-  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit+ tau_relative + tau_joint_limit_ns_act ;
+  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit+ tau_relative ;
   // Saturate torque rate to avoid discontinuities
   tau_d_left << saturateTorqueRateLeft(tau_d_left, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {
@@ -527,7 +522,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace_right(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7), tau_joint_limit_ns(7), tau_joint_limit_ns_act(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_right(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7);
 
   null_space_error.setZero();
   null_space_error(0)=(right_arm_data.q_d_nullspace_(0) - q(0));
@@ -548,42 +543,24 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   //Avoid joint limits
   tau_joint_limit.setZero(); // the comment on the right side is the joint limit reported by 
-  if (q(0)>2.85)      { tau_joint_limit(0)=-2*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(0)<-2.85)     { tau_joint_limit(0)=+2*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
-  if (q(1)>1.7)       { tau_joint_limit(1)=-2*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
-  if (q(1)<-1.7)      { tau_joint_limit(1)=+2*(std::exp((-q(1)-1.7)/(1.7628-1.7))-1); }//1.7628
-  if (q(2)>2.85)      { tau_joint_limit(2)=-2*(std::exp((q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(2)<-2.85)     { tau_joint_limit(2)=+2*(std::exp((-q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(3)>-0.1)      { tau_joint_limit(3)=-2*(std::exp((q(3)+0.1)/(0.1-0.0698))-1); } //-0.0698
-  if (q(3)<-3.0)      { tau_joint_limit(3)=2*(std::exp((-q(3)-3.0)/(3.0718-3.00))-1); } //-3.0718
-  if (q(4)>2.85)      { tau_joint_limit(4)=-2*(std::exp((q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(4)<-2.85)     { tau_joint_limit(4)=+2*(std::exp((-q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(5)>3.7)       { tau_joint_limit(5)=-2*(std::exp((q(5)-3.7)/(3.7525-3.7))-1); } //3.7525
-  if (q(5)<0.05)      { tau_joint_limit(5)=2*(std::exp((std::abs(q(5)-0.05)/(0.05+0.0175)))-1); } //-0.0175
-  if (q(6)>2.7)      { tau_joint_limit(6)=-5*(std::exp((q(6)-2.7)/(2.8973-2.7))-1); }  //2.8973
-  if (q(6)<-2.7)     { tau_joint_limit(6)=+5*(std::exp((-q(6)-2.7)/(2.8973-2.7))-1); } //2.8973
+  // (double q_value, double threshold, double magnitude, double upper_bound, double lower_bound) 
+  tau_joint_limit(0) = calculateTauJointLimit(q(0), 0.05, 4.0, joint_limits[0][1], joint_limits[0][0]); 
+  tau_joint_limit(1) = calculateTauJointLimit(q(1), 0.05, 4.0, joint_limits[1][1], joint_limits[1][0]);
+  tau_joint_limit(2) = calculateTauJointLimit(q(2), 0.05, 4.0, joint_limits[2][1], joint_limits[2][0]);
+  tau_joint_limit(3) = calculateTauJointLimit(q(3), 0.05, 4.0, joint_limits[3][1], joint_limits[3][0]);
+  tau_joint_limit(4) = calculateTauJointLimit(q(4), 0.05, 4.0, joint_limits[4][1], joint_limits[4][0]);
+  tau_joint_limit(5) = calculateTauJointLimit(q(5), 0.05, 4.0, joint_limits[5][1], joint_limits[5][0]);
+  tau_joint_limit(6) = calculateTauJointLimit(q(6), 0.05, 4.0, joint_limits[6][1], joint_limits[6][0]);
 
 
 
-  if (q(0)>2.85)      { tau_joint_limit_ns(0)=-5*(std::exp((q(0)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(0)<-2.85)     { tau_joint_limit_ns(0)=+5*(std::exp((-q(0)-2.85)/(2.8973-2.85))-1); } //2.8973; 
-  if (q(1)>1.7)       { tau_joint_limit_ns(1)=-5*(std::exp((q(1)-1.7)/(1.7628-1.7))-1); } //1.7628
-  if (q(1)<-1.7)      { tau_joint_limit_ns(1)=+5*(std::exp((-q(1)-1.7)/(1.7628-1.7))-1); }//1.7628
-  if (q(2)>2.85)      { tau_joint_limit_ns(2)=-5*(std::exp((q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(2)<-2.85)     { tau_joint_limit_ns(2)=+5*(std::exp((-q(2)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(3)>-0.1)      { tau_joint_limit_ns(3)=-5*(std::exp((q(3)+0.1)/(0.1-0.0698))-1); } //-0.0698
-  if (q(3)<-3.0)      { tau_joint_limit_ns(3)=5*(std::exp((-q(3)-3.0)/(3.0718-3.00))-1); } //-3.0718
-  if (q(4)>2.85)      { tau_joint_limit_ns(4)=-5*(std::exp((q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(4)<-2.85)     { tau_joint_limit_ns(4)=+5*(std::exp((-q(4)-2.85)/(2.8973-2.85))-1); } //2.8973
-  if (q(5)>3.7)       { tau_joint_limit_ns(5)=-5*(std::exp((q(5)-3.7)/(3.7525-3.7))-1); } //3.7525
-  if (q(5)<0.05)      { tau_joint_limit_ns(5)=5*(std::exp((std::abs(q(5)-0.05)/(0.05+0.0175)))-1); } //-0.0175
-  if (q(6)>2.7)      { tau_joint_limit_ns(6)=-10*(std::exp((q(6)-2.7)/(2.8973-2.7))-1); }  //2.8973
-  if (q(6)<-2.7)     { tau_joint_limit_ns(6)=+10*(std::exp((-q(6)-2.7)/(2.8973-2.7))-1); } //2.8973
+for (int i = 0; i < 7; ++i) {
+    tau_joint_limit(i) = std::max(std::min(tau_joint_limit(i), 5.0), -5.0);
+}
 
-  tau_joint_limit_ns_act << 5* (Eigen::MatrixXd::Identity(7, 7) -
-                    jacobian.transpose() * jacobian_transpose_pinv) * tau_joint_limit_ns ;
+
   tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); //TODO: MAKE THIS VELOCITY RELATIVE
+                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); 
   // Desired torque
   tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit+tau_relative;
   // Saturate torque rate to avoid discontinuities
@@ -698,6 +675,19 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
           << 0.0 * Eigen::Matrix3d::Identity();
 
+}
+
+
+double BiManualCartesianImpedanceControl::calculateTauJointLimit(double q_value, double threshold, double magnitude, double upper_bound, double lower_bound) {
+    double upper_limit = upper_bound - threshold;
+    double lower_limit = lower_bound + threshold;
+    if (q_value > (upper_limit)) {
+        return -magnitude * (std::exp( std::abs( q_value - upper_limit )/threshold) - 1);
+    } else if (q_value < lower_limit) {
+        return +magnitude * (std::exp( std::abs( q_value - lower_limit )/threshold) - 1);
+    } else {
+        return 0;
+    }
 }
 
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left(

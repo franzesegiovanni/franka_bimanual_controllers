@@ -2,12 +2,19 @@
 <launch>
   <arg name="robot_right_ip"/>
   <arg name="robot_left_ip"/>
+  <arg name="arm_right_id" default="panda"/>
+  <arg name="arm_left_id" default="panda"/>
   <arg name="robot_id" default="panda_dual" />
   <arg name="rviz" default="true" />
   <arg name="rqt" default="true" />
   <arg name="robot_id_right" value="panda_right" />
   <arg name="robot_id_left" value="panda_left" />
   <arg name="robot_ips" value="{panda_right/robot_ip: $(arg robot_right_ip),panda_left/robot_ip: $(arg robot_left_ip)}" />
+
+
+  <rosparam ns="robot_id_right" file="$(find franka_description)/robots/$(arg arm_right_id)/joint_limits.yaml" command="load"/>
+
+  <rosparam ns="robot_id_left" file="$(find franka_description)/robots/$(arg arm_left_id)/joint_limits.yaml" command="load"/>
 
   <include file="$(find franka_bimanual_controllers)/launch/franka_combined_control.launch" >
     <arg name="robot_id" value="$(arg robot_id)" />

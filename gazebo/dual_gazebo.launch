@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gazebo"      default="true"  doc="Should the gazebo simulation be launched? Use false in case if you want to include this file and launch gazebo yourself" />
+  <arg name="headless"    default="false" doc="Should the gazebo GUI be launched?" />
+  <arg name="paused"      default="true" doc="Should the simulation directly be stopped at 0s?" />
+  <arg name="rviz"        default="false" doc="Should RVIz be launched?" />
+  <arg name="use_gripper" default="true"  doc="Should a franka hand be mounted on the flange?" />
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch" >
+    <!-- Start paused, simulation will be started, when Pandas were loaded -->
+    <arg name="paused" value="true"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+ <include file="$(find franka_bimanual_controllers)/gazebo/panda.launch">
+   <arg name="arm_id"     value="panda_left" />
+   <arg name="x"          value="0" />
+   <arg name="y"          value="-0.5" />
+   <arg name="z"          value="0" />
+   <arg name="rviz"       value="false" />
+   <arg name="gazebo"     value="false" />
+   <arg name="paused"     value="true" />
+ </include>
+
+ <include file="$(find franka_bimanual_controllers)/gazebo/panda.launch">
+   <arg name="arm_id"     value="panda_right" />
+   <arg name="x"          value="0" />
+   <arg name="y"          value="0.5" />
+   <arg name="z"          value="0" />
+   <arg name="rviz"       value="false" />
+   <arg name="gazebo"     value="false" />
+   <arg name="paused"     value="$(arg paused)" />
+ </include>
+
+<rosparam file="$(find franka_bimanual_controllers)/gazebo/config/sim_controllers.yaml" subst_value="true" />
+
+
+  <!-- The space separated list of controllers to start in this launch files. The controllers should be known from the controllers_file -->
+  <arg name="controllers_to_start" default="panda_right_state_controller panda_left_state_controller"/>
+  <!-- The list of the joint_states topics of all combined robots to fuse to a complete topic -->
+  <arg name="joint_states_source_list" default="[panda_right_state_controller/joint_states, panda_left_state_controller/joint_states, panda_right/franka_gripper/joint_states, panda_left/franka_gripper/joint_states]"/>
+
+  <node pkg="controller_manager" type="spawner" name="controller_spawner" args="$(arg controllers_to_start)" output="screen" />
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen"/>
+    <node name="joint_state_publisher" type="joint_state_publisher" pkg="joint_state_publisher" output="screen">
+      <rosparam param="source_list"  subst_value="true">$(arg joint_states_source_list)</rosparam>
+      <param name="rate" value="30"/>
+    </node>
+
+<node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" required="false" />
+</launch>

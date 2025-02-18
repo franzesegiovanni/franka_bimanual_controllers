@@ -19,7 +19,36 @@
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 #include "sensor_msgs/JointState.h"
+
 namespace franka_bimanual_controllers {
+void CartesianVariableImpedanceController::loadModel_left() {
+  std::cout << "Loading nothing as we are using the internal model" << std::endl;
+}
+
+std::array<double, 42> CartesianVariableImpedanceController::get_jacobian_left(franka::RobotState robot_state_left)
+{
+      return left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+}
+
+double* CartesianVariableImpedanceController::get_fk(franka::RobotState robot_state_left)
+{
+  return robot_state_left.O_T_EE.data();
+}
+
+void CartesianVariableImpedanceController::loadModel_right() {
+  std::cout << "Loading nothing as we are using the internal model" << std::endl;
+}
+
+std::array<double, 42> CartesianVariableImpedanceController::get_jacobian_right(franka::RobotState robot_state_right)
+{
+      return right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+}
+
+double* CartesianVariableImpedanceController::get_fk(franka::RobotState robot_state_left)
+{
+  return robot_state_left.O_T_EE.data();
+}
+
 
 bool BiManualCartesianImpedanceControl::initArm(
     hardware_interface::RobotHW* robot_hw,
@@ -215,6 +244,7 @@ void BiManualCartesianImpedanceControl::startingArmLeft() {
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_initial(initial_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
+  double* T_EE = this->get_fk(initial_state);
   Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
 
   // set target point to current state

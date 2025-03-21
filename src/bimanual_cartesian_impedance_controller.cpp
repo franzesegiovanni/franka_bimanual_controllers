@@ -20,35 +20,53 @@
 #include <tf_conversions/tf_eigen.h>
 #include "sensor_msgs/JointState.h"
 
+
 namespace franka_bimanual_controllers {
-void CartesianVariableImpedanceController::loadModel_left() {
-  std::cout << "Loading nothing as we are using the internal model" << std::endl;
+
+void BiManualCartesianImpedanceControl::loadModel() {
+  std::string package_path = ros::package::getPath("franka_bimanual_controllers");
+  urdf_path_left = package_path + "/urdf/panda_calibrated_left.urdf";
+  urdf_path_right = package_path + "/urdf/panda_calibrated_right.urdf";
+
+  ros::param::get("frame_name", frame_name_);
+
+  std::cout << "Loading urdf into pinocchio as we are using the calibrated urdf model" << std::endl;
+  pinocchio::urdf::buildModel(urdf_path_left, model_pin_left_);
+  data_pin_left_ = new pinocchio::Data(model_pin_left_);
+  pinocchio::urdf::buildModel(urdf_path_right, model_pin_right_);
+  data_pin_right_ = new pinocchio::Data(model_pin_right_);
+  std::cout << "Succesfully loaded the model and created the data pointer for both the robots." << std::endl;
 }
 
-std::array<double, 42> CartesianVariableImpedanceController::get_jacobian_left(franka::RobotState robot_state_left)
+double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
 {
-      return left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+  Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
+  Eigen::VectorXd q_vector = Eigen::VectorXd::Map(q.data(), q.size());
+
+  pinocchio::forwardKinematics(model_pin, *data_pin, q_vector);
+  pinocchio::updateFramePlacement(model_pin, *data_pin, model_pin.getFrameId(frame_name_));
+  const auto& transformation = data_pin->oMf[model_pin.getFrameId(frame_name_)];  // Get the transformation of the frame
+  
+  // Allocate memory for the result
+  double* result = new double[16];
+  std::memcpy(result, transformation.toHomogeneousMatrix().data(), 16 * sizeof(double));
+  return result; // Caller is responsible for deleting the allocated memory
 }
 
-double* CartesianVariableImpedanceController::get_fk(franka::RobotState robot_state_left)
+std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
 {
-  return robot_state_left.O_T_EE.data();
-}
+  Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
+  Eigen::VectorXd q_vector = Eigen::VectorXd::Map(q.data(), q.size());
+  Eigen::MatrixXd jacobian(6, model_pin.nv);  // 6xnv matrix for spatial Jacobian
+  jacobian.fill(0);  // Initialize to zero
 
-void CartesianVariableImpedanceController::loadModel_right() {
-  std::cout << "Loading nothing as we are using the internal model" << std::endl;
+  pinocchio::forwardKinematics(model_pin, *data_pin, q_vector);
+  pinocchio::computeJointJacobians(model_pin, *data_pin, q_vector);
+  pinocchio::getFrameJacobian(model_pin, *data_pin, model_pin.getFrameId(frame_name_), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
+  std::array<double, 42> result;
+  std::memcpy(result.data(), jacobian.data(), 42 * sizeof(double));
+  return result;
 }
-
-std::array<double, 42> CartesianVariableImpedanceController::get_jacobian_right(franka::RobotState robot_state_right)
-{
-      return right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-}
-
-double* CartesianVariableImpedanceController::get_fk(franka::RobotState robot_state_left)
-{
-  return robot_state_left.O_T_EE.data();
-}
-
 
 bool BiManualCartesianImpedanceControl::initArm(
     hardware_interface::RobotHW* robot_hw,
@@ -238,14 +256,13 @@ void BiManualCartesianImpedanceControl::startingArmLeft() {
 
   franka::RobotState initial_state = left_arm_data.state_handle_->getRobotState();
   // get jacobian
-  std::array<double, 42> jacobian_array =
-      left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_left_,  data_pin_left_);
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_initial(initial_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-  double* T_EE = this->get_fk(initial_state);
-  Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+  double* O_T_EE = this->get_fk(initial_state, model_pin_left_, data_pin_left_);
+  Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(O_T_EE));
 
   // set target point to current state
   left_arm_data.position_d_ = initial_transform.translation();
@@ -264,13 +281,13 @@ void BiManualCartesianImpedanceControl::startingArmRight() {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   franka::RobotState initial_state = right_arm_data.state_handle_->getRobotState();
   // get jacobian
-  std::array<double, 42> jacobian_array =
-      right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_right_,data_pin_right_);
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_initial(initial_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-  Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+  double* O_T_EE = this->get_fk(initial_state,  model_pin_right_,  data_pin_right_);
+  Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(O_T_EE));
 
   // set target point to current state
   right_arm_data.position_d_ = initial_transform.translation();
@@ -287,13 +304,14 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
+  franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
+
   std::array<double, 49> inertia_array = left_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = left_arm_data.model_handle_->getCoriolis();
-  std::array<double, 42> jacobian_array =
-      left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-  
-  std::array<double, 42> jacobian_array_right =
-      right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+
+  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
+  std::array<double, 42> jacobian_array_right = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
+
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
@@ -301,14 +319,15 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_left.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_left.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d( robot_state_left.tau_J_d.data());
-  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state_left.O_T_EE.data()));
+  double* O_T_EE = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_);
+  Eigen::Affine3d transform(Eigen::Matrix4d::Map(O_T_EE));
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
   Eigen::MatrixXd jacobian_transpose_pinv;
   franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
 
-  franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
-  Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(robot_state_right.O_T_EE.data()));
+  double* O_T_EE_right = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_);
+  Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(O_T_EE_right));
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_right(robot_state_right.dq.data());
   Eigen::Vector3d position_right(transform_right.translation());
   // left_arm_data.position_other_arm_=position_right;
@@ -428,7 +447,7 @@ for (int i = 0; i < 7; ++i) {
 }
 
   tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right)); //TODO: MAKE THIS VELOCITY RELATIVE
+                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right));
   // Desired torque
   tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit+ tau_relative ;
   // Saturate torque rate to avoid discontinuities
@@ -456,13 +475,11 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   // get state variables
   franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
+  franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
   std::array<double, 49> inertia_array = right_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = right_arm_data.model_handle_->getCoriolis();
-  std::array<double, 42> jacobian_array =
-      right_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-
-  std::array<double, 42> jacobian_array_left =
-      left_arm_data.model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
+  std::array<double, 42> jacobian_array_left = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
@@ -472,14 +489,15 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state_right.tau_J_d.data());
-  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state_right.O_T_EE.data()));
+  double* O_T_EE = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_);
+  Eigen::Affine3d transform(Eigen::Matrix4d::Map(O_T_EE));
+
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
   Eigen::MatrixXd jacobian_transpose_pinv;
   franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
-
-  franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
-  Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(robot_state_left.O_T_EE.data()));
+  double* O_T_EE_left = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_);
+  Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(O_T_EE_left));
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_left(robot_state_left.dq.data());
   Eigen::Vector3d position_left(transform_left.translation());
   // compute error to desired pose

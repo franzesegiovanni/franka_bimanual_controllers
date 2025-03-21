@@ -22,7 +22,13 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 #include <franka_hw/trigger_rate.h>
-
+#include <ros/package.h>
+#include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/joint-configuration.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
+#include <pinocchio/algorithm/frames.hpp>
+#include <pinocchio/parsers/urdf.hpp>
+#define EIGEN_DONT_ALIGN_STATICALLY
 namespace franka_bimanual_controllers {
 
 /**
@@ -93,8 +99,6 @@ class BiManualCartesianImpedanceControl
    *
    * @param[in] period The control period (here 0.001s).
    */
-  void update(const ros::Time&, const ros::Duration& period) override;
-
  private:
   std::map<std::string, FrankaDataContainer>
       arms_data_;             ///< Holds all relevant data for both arms.
@@ -114,6 +118,17 @@ class BiManualCartesianImpedanceControl
   franka_hw::TriggerRate publish_rate_;
   Eigen::Matrix<float, 7, 1> stiff_;
   double delta_lim;
+
+  // Define the variables for the external model
+    std::string urdf_path_left;
+    std::string urdf_path_right;
+    pinocchio::Model model_pin_left_;
+    pinocchio::Model model_pin_right_ ;   
+    pinocchio::Data* data_pin_left_;
+    pinocchio::Data* data_pin_right_;
+    std::string frame_name_;
+    int frame_id_;
+
   /**
    * Saturates torque commands to ensure feasibility.
    *
@@ -197,6 +212,12 @@ class BiManualCartesianImpedanceControl
 
    double calculateTauJointLimit(double q_value, double threshold, double magnitude, double upper_bound, double lower_bound);
 
+    void update(const ros::Time&, const ros::Duration& period) override;
+    void loadModel();
+    /// Define a virtual class for the forward kinematics of lef and right 
+    double* get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin);
+    // Define a virtual class for the jacobian of lef and right
+    std::array<double, 42> get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin);
 
 };
 

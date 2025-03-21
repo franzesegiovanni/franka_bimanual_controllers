@@ -24,6 +24,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Eigen3 REQUIRED)
 find_package(Franka 0.7.0 REQUIRED)
+find_package(pinocchio REQUIRED)
+
 
 add_message_files(FILES
   JointTorqueComparison.msg
@@ -70,12 +72,14 @@ add_dependencies(franka_bimanual_controllers
 target_link_libraries(franka_bimanual_controllers PUBLIC
   ${Franka_LIBRARIES}
   ${catkin_LIBRARIES}
+  pinocchio::pinocchio
 )
 
 target_include_directories(franka_bimanual_controllers SYSTEM PUBLIC
   ${Franka_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
+  ${PINOCCHIO_INCLUDE_DIRS}
 )
 target_include_directories(franka_bimanual_controllers PUBLIC
   include

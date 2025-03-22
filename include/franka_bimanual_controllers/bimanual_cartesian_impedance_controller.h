@@ -23,11 +23,8 @@
 #include <franka_hw/franka_state_interface.h>
 #include <franka_hw/trigger_rate.h>
 #include <ros/package.h>
-#include <pinocchio/algorithm/kinematics.hpp>
-#include <pinocchio/algorithm/joint-configuration.hpp>
-#include <pinocchio/algorithm/jacobian.hpp>
-#include <pinocchio/algorithm/frames.hpp>
-#include <pinocchio/parsers/urdf.hpp>
+#include <pinocchio/multibody/model.hpp>
+#include <pinocchio/multibody/data.hpp>
 #define EIGEN_DONT_ALIGN_STATICALLY
 namespace franka_bimanual_controllers {
 

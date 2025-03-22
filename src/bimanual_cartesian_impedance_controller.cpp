@@ -1,5 +1,12 @@
 // Copyright (c) 2019 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
+
+#include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/joint-configuration.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
+#include <pinocchio/algorithm/frames.hpp>
+#include <pinocchio/parsers/urdf.hpp>
+
 #include <franka_bimanual_controllers/bimanual_cartesian_impedance_controller.h>
 
 #include <cmath>

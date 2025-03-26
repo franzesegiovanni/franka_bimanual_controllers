@@ -126,6 +126,14 @@ class BiManualCartesianImpedanceControl
     std::string frame_name_;
     int frame_id_;
 
+    Eigen::Matrix3d R_left;
+    Eigen::Vector3d t_left;
+    Eigen::Matrix3d R_right;
+    Eigen::Vector3d t_right;
+    Eigen::Affine3d transform_base_to_left;
+    Eigen::Affine3d transform_base_to_right;
+    
+
   /**
    * Saturates torque commands to ensure feasibility.
    *
@@ -187,8 +195,15 @@ class BiManualCartesianImpedanceControl
   ros::Subscriber sub_equilibrium_pose_right_;
   void equilibriumPoseCallback_right(const geometry_msgs::PoseStampedConstPtr& msg);
 
+  ros::Subscriber sub_equilibrium_pose_right_global_frame_;
+  void equilibriumPoseCallback_right_global(const geometry_msgs::PoseStampedConstPtr& msg);
+
   ros::Subscriber sub_equilibrium_pose_left_;
   void equilibriumPoseCallback_left(const geometry_msgs::PoseStampedConstPtr& msg);
+
+  ros::Subscriber sub_equilibrium_pose_left_global_frame_;
+  void equilibriumPoseCallback_left_global(const geometry_msgs::PoseStampedConstPtr& msg);
+
 
   ros::Subscriber sub_equilibrium_distance_;
   void equilibriumPoseCallback_relative(const geometry_msgs::PoseStampedConstPtr& msg);
@@ -201,6 +216,9 @@ class BiManualCartesianImpedanceControl
 
    ros::Publisher pub_right;
    ros::Publisher pub_left;
+
+   ros::Publisher pub_right_global_frame;
+   ros::Publisher pub_left_global_frame;
 
    ros::Publisher pub_force_torque_right;
    ros::Publisher pub_force_torque_left;

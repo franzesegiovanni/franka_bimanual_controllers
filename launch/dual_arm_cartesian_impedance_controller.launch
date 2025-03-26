@@ -12,6 +12,7 @@
 
   <param name="frame_name" value="panda_hand_tcp"/>
   <rosparam file="$(find franka_description)/robots/$(arg arm_id)/joint_limits.yaml" command="load"/>
+  <rosparam file="$(find franka_bimanual_controllers)/config/relative_position.yaml" command="load"/>
 
   <include file="$(find franka_bimanual_controllers)/launch/franka_combined_control.launch" >
     <arg name="robot_id" value="$(arg robot_id)" />

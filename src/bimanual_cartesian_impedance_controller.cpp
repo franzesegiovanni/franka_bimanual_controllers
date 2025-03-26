@@ -158,11 +158,74 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
 
   this->loadModel();
 
+  // Read parameters for left arm
+  double left_orientation_p, left_orientation_r, left_orientation_y;
+  double left_position_x, left_position_y, left_position_z;
+
+  if (!node_handle.getParam("/left/orientation/p", left_orientation_p) ||
+      !node_handle.getParam("/left/orientation/r", left_orientation_r) ||
+      !node_handle.getParam("/left/orientation/y", left_orientation_y) ||
+      !node_handle.getParam("/left/position/x", left_position_x) ||
+      !node_handle.getParam("/left/position/y", left_position_y) ||
+      !node_handle.getParam("/left/position/z", left_position_z)) {
+    ROS_ERROR("Failed to get left arm parameters");
+    return false;
+  }
+
+  // Create transformation matrix for left arm
+  R_left.setIdentity();
+  R_left = Eigen::AngleAxisd(left_orientation_y, Eigen::Vector3d::UnitZ()) *
+           Eigen::AngleAxisd(left_orientation_r, Eigen::Vector3d::UnitY()) *
+           Eigen::AngleAxisd(left_orientation_p, Eigen::Vector3d::UnitX());
+
+  t_left.setZero();
+  t_left << left_position_x, left_position_y, left_position_z;
+  // Read parameters for right arm
+  double right_orientation_p, right_orientation_r, right_orientation_y;
+  double right_position_x, right_position_y, right_position_z;
+
+  if (!node_handle.getParam("/right/orientation/p", right_orientation_p) ||
+      !node_handle.getParam("/right/orientation/r", right_orientation_r) ||
+      !node_handle.getParam("/right/orientation/y", right_orientation_y) ||
+      !node_handle.getParam("/right/position/x", right_position_x) ||
+      !node_handle.getParam("/right/position/y", right_position_y) ||
+      !node_handle.getParam("/right/position/z", right_position_z)) {
+    ROS_ERROR("Failed to get right arm parameters");
+    return false;
+  }
+
+  // Create transformation matrix for right arm
+  R_right.setIdentity();
+  R_right = Eigen::AngleAxisd(right_orientation_y, Eigen::Vector3d::UnitZ()) *
+            Eigen::AngleAxisd(right_orientation_r, Eigen::Vector3d::UnitY()) *
+            Eigen::AngleAxisd(right_orientation_p, Eigen::Vector3d::UnitX());
+
+  t_right.setZero();
+  t_right << right_position_x, right_position_y, right_position_z;
+
+  // Print the transformation matrices
+  std::cout << "Transformation matrix for left arm: " << std::endl;
+  std::cout << "Rotation matrix: " << std::endl;
+  std::cout << R_left << std::endl;
+  std::cout << "Translation vector: " << std::endl;
+  std::cout << t_left << std::endl;
+  std::cout << "Transformation matrix for right arm: " << std::endl;
+  std::cout << "Rotation matrix: " << std::endl;
+  std::cout << R_right << std::endl;
+  std::cout << "Translation vector: " << std::endl;
+  std::cout << t_right << std::endl;
   if (!node_handle.getParam("left/arm_id", left_arm_id_)) {
     ROS_ERROR_STREAM(
         "BiManualCartesianImpedanceControl: Could not read parameter left_arm_id_");
     return false;
   }
+
+  // Create transformation matrix for left arm
+
+  transform_base_to_left.linear() = R_left;
+  transform_base_to_left.translation() = t_left;
+  transform_base_to_right.linear() = R_right;
+  transform_base_to_right.translation() = t_right;
   std::vector<std::string> left_joint_names;
   if (!node_handle.getParam("left/joint_names", left_joint_names) || left_joint_names.size() != 7) {
     ROS_ERROR(
@@ -194,9 +257,20 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   sub_equilibrium_pose_right_ = node_handle.subscribe(
       "panda_right_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right, this,
       ros::TransportHints().reliable().tcpNoDelay());
+
+  // sub_equilibrium_pose_right_global_frame_ = node_handle.subscribe(
+  //     "panda_right_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global, this,
+  //     ros::TransportHints().reliable().tcpNoDelay());
+
   sub_equilibrium_pose_left_ = node_handle.subscribe(
       "panda_left_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left, this,
       ros::TransportHints().reliable().tcpNoDelay());
+  
+  // sub_equilibrium_pose_left_global_frame_ = node_handle.subscribe(
+  //     "panda_left_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left_global, this,
+  //     ros::TransportHints().reliable().tcpNoDelay());
+  
+
 
   sub_nullspace_right_ = node_handle.subscribe(
     "panda_right_nullspace", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right, this,
@@ -214,6 +288,9 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("panda_right_cartesian_pose", 1);
 
   pub_left = node_handle.advertise<geometry_msgs::PoseStamped>("panda_left_cartesian_pose", 1);
+
+  pub_right_global_frame = node_handle.advertise<geometry_msgs::PoseStamped>("panda_right_cartesian_pose_global_frame", 1);
+  pub_left_global_frame = node_handle.advertise<geometry_msgs::PoseStamped>("panda_left_cartesian_pose_global_frame", 1);
 
   pub_force_torque_right= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_right_ext",1);
   pub_force_torque_left= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_left_ext",1);
@@ -345,6 +422,20 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(O_T_EE_right));
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_right(robot_state_right.dq.data());
   Eigen::Vector3d position_right(transform_right.translation());
+
+  // find the transformatio in base frame
+  Eigen::Affine3d transform_base_to_left = transform_base_to_left * transform;
+  // publish this transformation to the topic
+  geometry_msgs::PoseStamped msg_left_global;
+  msg_left_global.pose.position.x=transform_base_to_left.translation()[0];
+  msg_left_global.pose.position.y=transform_base_to_left.translation()[1];
+  msg_left_global.pose.position.z=transform_base_to_left.translation()[2];
+  Eigen::Quaterniond orientation_base_to_left(transform_base_to_left.linear());
+  msg_left_global.pose.orientation.x=orientation_base_to_left.x();
+  msg_left_global.pose.orientation.y=orientation_base_to_left.y();
+  msg_left_global.pose.orientation.z=orientation_base_to_left.z();
+  msg_left_global.pose.orientation.w=orientation_base_to_left.w();
+  pub_left_global_frame.publish(msg_left_global);  
   // left_arm_data.position_other_arm_=position_right;
   // compute error to desired pose
   // position error
@@ -524,6 +615,19 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   error_right[1]=std::max(-delta_lim, std::min(error_right[1], delta_lim));
   error_right[2]=std::max(-delta_lim, std::min(error_right[2], delta_lim));
 
+  // find the transformatio in base frame
+  Eigen::Affine3d transform_base_to_right = transform_base_to_right * transform;
+  // publish this transformation to the topic
+  geometry_msgs::PoseStamped msg_right_global;
+  msg_right_global.pose.position.x=transform_base_to_right.translation()[0];
+  msg_right_global.pose.position.y=transform_base_to_right.translation()[1];
+  msg_right_global.pose.position.z=transform_base_to_right.translation()[2];
+  Eigen::Quaterniond orientation_base_to_right(transform_base_to_right.linear());
+  msg_right_global.pose.orientation.x=orientation_base_to_right.x();
+  msg_right_global.pose.orientation.y=orientation_base_to_right.y();
+  msg_right_global.pose.orientation.z=orientation_base_to_right.z();
+  msg_right_global.pose.orientation.w=orientation_base_to_right.w();
+  pub_right_global_frame.publish(msg_right_global);
 
   geometry_msgs::PoseStamped msg_right;
   msg_right.pose.position.x=position[0];

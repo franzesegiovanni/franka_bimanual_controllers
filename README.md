@@ -52,7 +52,7 @@ catkin build -DMAKE_BUILD_TYPE=Release -DFranka_DIR:PATH=~/libfranka/build
 To start the controller use this command
 
 ```
-roslaunch franka_bimanual_controllers dual_arm_cartesian_impedance_example_controller.launch robot_right_ip:=<ip_robot_right> robot_left_ip:=<ip_robot_left> arm_id:=<arm_id>
+roslaunch franka_bimanual_controllers dual_arm_cartesian_impedance_controller.launch robot_right_ip:=<ip_robot_right> robot_left_ip:=<ip_robot_left> arm_id:=<arm_id>
 ```
 
 where <ip_robot_right> and <ip_robot_left> are the ip of the right and left robot respectively. The arm_id is the id of the robot that you have in the bimanual setup, i.e. panda or fr3. This code does not support hybrid panda-fr3 setup. 

@@ -9,7 +9,7 @@
   <!-- box shaped table as base for the 2 Pandas -->
   <link name="base">
     <visual>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <origin xyz="0 0 -0.5" rpy="0 0 0"/>
       <geometry>
         <box size="1 2 1" />
       </geometry>
@@ -18,33 +18,44 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <origin xyz="0 0 -0.5" rpy="0 0 0"/>
       <geometry>
         <box size="1 2 1" />
       </geometry>
     </collision>
   </link>
-<!-- Load the yaml file in franka_bimanual_controllers with realative_position in it -->
-  <xacro:property name="realative_position" value="${xacro.load_yaml('$(find franka_bimanual_controllers)/config/realative_position.yaml')}"/>
-  <xacro:property name="left_position_x" value="${realative_position['left']['position']['x']}"/>
-  <xacro:property name="left_position_y" value="${realative_position['left']['position']['y']}"/>
-  <xacro:property name="left_position_y" value="${realative_position['left']['position']['z']}"/>
-  <xacro:property name="left_orientation_r" value="${realative_position['left']['orientation']['r']}"/>
-  <xacro:property name="left_orientation_p" value="${realative_position['left']['orientation']['p']}"/>
-  <xacro:property name="left_orientation_y" value="${realative_position['left']['orientation']['y']}"/>
+  
+<!-- Load the yaml file in franka_bimanual_controllers with relative_position in it -->
+  <xacro:property name="relative_position" value="${xacro.load_yaml('$(find franka_bimanual_controllers)/config/relative_position.yaml')}"/>
 
-  <xacro:property name="right_position_x" value="${realative_position['right']['position']['x']}"/>
-  <xacro:property name="right_position_y" value="${realative_position['right']['position']['y']}"/>
-  <xacro:property name="right_position_z" value="${realative_position['right']['position']['z']}"/>
-  <xacro:property name="right_orientation_r" value="${realative_position['right']['orientation']['r']}"/>
-  <xacro:property name="right_orientation_p" value="${realative_position['right']['orientation']['p']}"/>
-  <xacro:property name="right_orientation_y" value="${realative_position['right']['orientation']['y']}"/>
+
+  <xacro:property name="right_position_x" value="${relative_position['right']['position']['x']}"/>
+  <xacro:property name="right_position_y" value="${relative_position['right']['position']['y']}"/>
+  <xacro:property name="right_position_z" value="${relative_position['right']['position']['z']}"/>
+  <xacro:property name="right_orientation_r" value="${relative_position['right']['orientation']['r']}"/>
+  <xacro:property name="right_orientation_p" value="${relative_position['right']['orientation']['p']}"/>
+  <xacro:property name="right_orientation_y" value="${relative_position['right']['orientation']['y']}"/>
+
+  <xacro:property name="left_position_x" value="${relative_position['left']['position']['x']}"/>
+  <xacro:property name="left_position_y" value="${relative_position['left']['position']['y']}"/>
+  <xacro:property name="left_position_z" value="${relative_position['left']['position']['z']}"/>
+  <xacro:property name="left_orientation_r" value="${relative_position['left']['orientation']['r']}"/>
+  <xacro:property name="left_orientation_p" value="${relative_position['left']['orientation']['p']}"/>
+  <xacro:property name="left_orientation_y" value="${relative_position['left']['orientation']['y']}"/>
+
 
   <!-- right arm with gripper -->
-  <xacro:franka_arm arm_id="$(arg arm_id_1)" connected_to="base"  xyz="right_position_x right_position_y right_position_z" rpy="right_orientation_r right_orientation_p right_orientation_y" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
+  <xacro:franka_arm arm_id="$(arg arm_id_1)" connected_to="base"  xyz="${right_position_x} ${right_position_y} ${right_position_z}" rpy="${right_orientation_r} ${right_orientation_p} ${right_orientation_y}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
   <xacro:franka_hand arm_id="$(arg arm_id_1)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_1)_link8" safety_distance="0.03"/>
+  <xacro:franka_arm arm_id="$(arg arm_id_2)" connected_to="base"  xyz="${left_position_x} ${left_position_y} ${left_position_z}" rpy="${left_orientation_r} ${left_orientation_p} ${left_orientation_y}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
+  <xacro:franka_hand arm_id="$(arg arm_id_2)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_2)_link8" safety_distance="0.03"/>
+
+    <!-- right arm with gripper -->
+  <!-- <xacro:franka_arm arm_id="$(arg arm_id_1)" connected_to="base"  xyz="0 -0.5 1" rpy="0 0 ${-pi/2}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
+  <xacro:franka_hand arm_id="$(arg arm_id_1)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_1)_link8" safety_distance="0.03"/> -->
 
   <!-- left arm with gripper -->
-  <xacro:franka_arm arm_id="$(arg arm_id_2)" connected_to="base"  xyz="left_position_x left_position_y left_position_z" rpy="left_orientation_r left_orientation_p left_orientation_y" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
+  <!-- <xacro:franka_arm arm_id="$(arg arm_id_2)" connected_to="base"  xyz="0 0.5 1" rpy="0 0 ${pi/2}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
   <xacro:franka_hand arm_id="$(arg arm_id_2)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_2)_link8" safety_distance="0.03"/>
+   -->
 </robot>

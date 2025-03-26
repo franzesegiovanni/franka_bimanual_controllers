@@ -31,11 +31,14 @@
 namespace franka_bimanual_controllers {
 
 void BiManualCartesianImpedanceControl::loadModel() {
+  std::cout << "LOADING THE MODEL" << std::endl;
   std::string package_path = ros::package::getPath("franka_bimanual_controllers");
   urdf_path_left = package_path + "/urdf/panda_calibrated_left.urdf";
   urdf_path_right = package_path + "/urdf/panda_calibrated_right.urdf";
-
+  std::cout << "URDF Path Left: " << urdf_path_left << std::endl;
+  std::cout << "URDF Path Right: " << urdf_path_right << std::endl;
   ros::param::get("frame_name", frame_name_);
+  std::cout << "Frame Name: " << frame_name_ << std::endl;
 
   std::cout << "Loading urdf into pinocchio as we are using the calibrated urdf model" << std::endl;
   pinocchio::urdf::buildModel(urdf_path_left, model_pin_left_);
@@ -47,6 +50,7 @@ void BiManualCartesianImpedanceControl::loadModel() {
 
 double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
 {
+  // cout << "Getting the forward kinematics" << endl;s
   Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
   Eigen::VectorXd q_vector = Eigen::VectorXd::Map(q.data(), q.size());
 
@@ -57,11 +61,13 @@ double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state
   // Allocate memory for the result
   double* result = new double[16];
   std::memcpy(result, transformation.toHomogeneousMatrix().data(), 16 * sizeof(double));
+  // std::cout << "Forward Kinematics: " << transformation.toHomogeneousMatrix() << std::endl;
   return result; // Caller is responsible for deleting the allocated memory
 }
 
 std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
 {
+  // cout << "Getting the jacobian" << endl;
   Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
   Eigen::VectorXd q_vector = Eigen::VectorXd::Map(q.data(), q.size());
   Eigen::MatrixXd jacobian(6, model_pin.nv);  // 6xnv matrix for spatial Jacobian
@@ -72,6 +78,7 @@ std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::R
   pinocchio::getFrameJacobian(model_pin, *data_pin, model_pin.getFrameId(frame_name_), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
   std::array<double, 42> result;
   std::memcpy(result.data(), jacobian.data(), 42 * sizeof(double));
+  // std::cout << "Jacobian: " << jacobian << std::endl;
   return result;
 }
 
@@ -149,6 +156,7 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   std::vector<double> cartesian_stiffness_vector;
   std::vector<double> cartesian_damping_vector;
 
+  this->loadModel();
 
   if (!node_handle.getParam("left/arm_id", left_arm_id_)) {
     ROS_ERROR_STREAM(

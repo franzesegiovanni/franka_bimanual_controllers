@@ -280,9 +280,9 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
     "panda_left_nullspace", 20, &BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_left, this,
     ros::TransportHints().reliable().tcpNoDelay());
 
-  sub_equilibrium_distance_ = node_handle.subscribe(
-        "equilibrium_distance", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative, this,
-        ros::TransportHints().reliable().tcpNoDelay());
+  // sub_equilibrium_distance_ = node_handle.subscribe(
+  //       "equilibrium_distance", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative, this,
+  //       ros::TransportHints().reliable().tcpNoDelay());
 
 
   pub_right = node_handle.advertise<geometry_msgs::PoseStamped>("panda_right_cartesian_pose", 1);

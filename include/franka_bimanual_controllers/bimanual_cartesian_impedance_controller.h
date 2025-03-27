@@ -206,7 +206,7 @@ class BiManualCartesianImpedanceControl
 
 
   ros::Subscriber sub_equilibrium_distance_;
-  void equilibriumPoseCallback_relative(const geometry_msgs::PoseStampedConstPtr& msg);
+//   void equilibriumPoseCallback_relative(const geometry_msgs::PoseStampedConstPtr& msg);
 
   ros::Subscriber sub_nullspace_right_;
   void equilibriumConfigurationCallback_right(const sensor_msgs::JointState::ConstPtr& joint);

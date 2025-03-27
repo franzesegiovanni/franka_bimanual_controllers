@@ -57,10 +57,10 @@ struct FrankaDataContainer {
   Eigen::Quaterniond orientation_d_;         ///< Target orientation of the end effector.
 
   Eigen::Vector3d position_other_arm_;               ///< Target position of the end effector.
-  Eigen::Vector3d position_d_relative_;
+//   Eigen::Vector3d position_d_relative_;
 
-  Eigen::Matrix<double, 6, 6> cartesian_stiffness_relative_;         ///< To track the target pose.
-  Eigen::Matrix<double, 6, 6> cartesian_damping_relative_;
+//   Eigen::Matrix<double, 6, 6> cartesian_stiffness_relative_;         ///< To track the target pose.
+//   Eigen::Matrix<double, 6, 6> cartesian_damping_relative_;
   Eigen::Matrix<double, 6, 1> force_torque;
 };
 

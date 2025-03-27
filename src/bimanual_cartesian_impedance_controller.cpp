@@ -258,17 +258,17 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
       "panda_right_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right, this,
       ros::TransportHints().reliable().tcpNoDelay());
 
-  // sub_equilibrium_pose_right_global_frame_ = node_handle.subscribe(
-  //     "panda_right_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global, this,
-  //     ros::TransportHints().reliable().tcpNoDelay());
+  sub_equilibrium_pose_right_global_frame_ = node_handle.subscribe(
+      "panda_right_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global, this,
+      ros::TransportHints().reliable().tcpNoDelay());
 
   sub_equilibrium_pose_left_ = node_handle.subscribe(
       "panda_left_equilibrium_pose", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left, this,
       ros::TransportHints().reliable().tcpNoDelay());
   
-  // sub_equilibrium_pose_left_global_frame_ = node_handle.subscribe(
-  //     "panda_left_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left_global, this,
-  //     ros::TransportHints().reliable().tcpNoDelay());
+  sub_equilibrium_pose_left_global_frame_ = node_handle.subscribe(
+      "panda_left_equilibrium_pose_global_frame", 20, &BiManualCartesianImpedanceControl::equilibriumPoseCallback_left_global, this,
+      ros::TransportHints().reliable().tcpNoDelay());
   
 
 
@@ -396,18 +396,18 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
-  franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
+  // franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
 
   std::array<double, 49> inertia_array = left_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = left_arm_data.model_handle_->getCoriolis();
 
   std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
-  std::array<double, 42> jacobian_array_right = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
+  // std::array<double, 42> jacobian_array_right = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
 
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_right(jacobian_array_right.data());
+  // Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_right(jacobian_array_right.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_left.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_left.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d( robot_state_left.tau_J_d.data());
@@ -418,10 +418,10 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::MatrixXd jacobian_transpose_pinv;
   franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
 
-  double* O_T_EE_right = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_);
-  Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(O_T_EE_right));
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_right(robot_state_right.dq.data());
-  Eigen::Vector3d position_right(transform_right.translation());
+  // double* O_T_EE_right = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_);
+  // Eigen::Affine3d transform_right(Eigen::Matrix4d::Map(O_T_EE_right));
+  // Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_right(robot_state_right.dq.data());
+  // Eigen::Vector3d position_right(transform_right.translation());
 
   // find the transformatio in base frame
   Eigen::Affine3d transform_base_to_left = transform_base_to_left * transform;
@@ -474,6 +474,17 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   force_torque_msg.wrench.torque.z=left_arm_data.force_torque[5];
   pub_force_torque_left.publish(force_torque_msg);
 
+
+  // std::array< double, 3 > gravity_global={{0., 0.,-9.81}};
+  Eigen::Vector3d gravity_global(0., 0.,-9.81);
+  Eigen::Vector3d gravity_local = orientation_base_to_left.inverse() * gravity_global;
+  std::array<double, 3> gravity_local_array = {gravity_local[0], gravity_local[1], gravity_local[2]};
+  std::array<double, 7> tau_gravity_internal_array = left_arm_data.model_handle_->getGravity();
+  std::array<double, 7> tau_gravity_real_array = left_arm_data.model_handle_->getGravity(gravity_local_array); //change the new gravity vector in lines 128 and 130. They should have opposite sign!
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_internal(tau_gravity_internal_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_real(tau_gravity_real_array.data());
+
+
   Eigen::Matrix<double, 6, 1> error_left;
   error_left.head(3) << position - left_arm_data.position_d_;
 
@@ -481,14 +492,13 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   error_left[1]=std::max(-delta_lim, std::min(error_left[1], delta_lim));
   error_left[2]=std::max(-delta_lim, std::min(error_left[2], delta_lim));
 
-  Eigen::Matrix<double, 6, 1> error_relative;
-  error_relative.head(3) << position - position_right;
-  error_relative.tail(3).setZero();
-  error_relative.head(3)<< error_relative.head(3) -left_arm_data.position_d_relative_;
+  // Eigen::Matrix<double, 6, 1> error_relative ;
+  // error_relative.head(3) << position - position_right -left_arm_data.position_d_relative_;
+  // error_relative.tail(3).setZero();
 
-  error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
-  error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
-  error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
+  // error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
+  // error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
+  // error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
 
   // orientation error
   if (left_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
@@ -508,13 +518,13 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace_left(7), tau_d_left(7), tau_joint_limit(7), null_space_error(7), tau_relative(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_left(7), tau_d_left(7), tau_joint_limit(7), null_space_error(7);
 
   tau_task.setZero();
   tau_d_left.setZero();
   tau_nullspace_left.setZero();
   tau_joint_limit.setZero();
-  tau_relative.setZero();
+  // tau_relative.setZero();
   // pseudoinverse for nullspace handling
   // kinematic pseuoinverse
   null_space_error.setZero();
@@ -552,10 +562,10 @@ for (int i = 0; i < 7; ++i) {
     tau_joint_limit(i) = std::max(std::min(tau_joint_limit(i), 5.0), -5.0);
 }
 
-  tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right));
+  // tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
+  //                                     left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right));
   // Desired torque
-  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit+ tau_relative ;
+  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit - tau_gravity_internal + tau_gravity_real; 
   // Saturate torque rate to avoid discontinuities
   tau_d_left << saturateTorqueRateLeft(tau_d_left, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {
@@ -581,15 +591,15 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   // get state variables
   franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
-  franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
+  // franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
   std::array<double, 49> inertia_array = right_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = right_arm_data.model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
-  std::array<double, 42> jacobian_array_left = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
+  // std::array<double, 42> jacobian_array_left = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_left(jacobian_array_left.data());
+  // Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian_left(jacobian_array_left.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_right.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_right.dq.data());
 
@@ -602,11 +612,12 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   Eigen::Quaterniond orientation(transform.linear());
   Eigen::MatrixXd jacobian_transpose_pinv;
   franka_bimanual_controllers::pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
-  double* O_T_EE_left = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_);
-  Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(O_T_EE_left));
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_left(robot_state_left.dq.data());
-  Eigen::Vector3d position_left(transform_left.translation());
+  // double* O_T_EE_left = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_);
+  // Eigen::Affine3d transform_left(Eigen::Matrix4d::Map(O_T_EE_left));
+  // Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_left(robot_state_left.dq.data());
+  // Eigen::Vector3d position_left(transform_left.translation());
   // compute error to desired pose
+
   // position error
   Eigen::Matrix<double, 6, 1> error_right;
   error_right.head(3) << position - right_arm_data.position_d_;
@@ -663,14 +674,21 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   force_torque_msg.wrench.torque.z=right_arm_data.force_torque[5];
   pub_force_torque_right.publish(force_torque_msg);
 
-  Eigen::Matrix<double, 6, 1> error_relative;
-  error_relative.head(3) << position - position_left;
-  error_relative.tail(3).setZero();
-  error_relative.head(3)<< error_relative.head(3) -right_arm_data.position_d_relative_;
+  Eigen::Vector3d gravity_global(0., 0.,-9.81);
+  Eigen::Vector3d gravity_local = orientation_base_to_right.inverse() * gravity_global;
+  std::array<double, 3> gravity_local_array = {gravity_local[0], gravity_local[1], gravity_local[2]};
+  std::array<double, 7> tau_gravity_internal_array = right_arm_data.model_handle_->getGravity();
+  std::array<double, 7> tau_gravity_real_array = right_arm_data.model_handle_->getGravity(gravity_local_array); //change the new gravity vector in lines 128 and 130. They should have opposite sign!
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_internal(tau_gravity_internal_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_real(tau_gravity_real_array.data());
+  // Eigen::Matrix<double, 6, 1> error_relative;
+  // error_relative.head(3) << position - position_left;
+  // error_relative.tail(3).setZero();
+  // error_relative.head(3)<< error_relative.head(3) -right_arm_data.position_d_relative_;
 
-  error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
-  error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
-  error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
+  // error_relative[0]=std::max(-delta_lim, std::min(error_relative[0], delta_lim));
+  // error_relative[1]=std::max(-delta_lim, std::min(error_relative[1], delta_lim));
+  // error_relative[2]=std::max(-delta_lim, std::min(error_relative[2], delta_lim));
   
   // orientation error
   if (right_arm_data.orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
@@ -689,7 +707,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   // compute control
   // allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace_right(7), tau_d(7), tau_joint_limit(7), null_space_error(7), tau_relative(7);
+  Eigen::VectorXd tau_task(7), tau_nullspace_right(7), tau_d(7), tau_joint_limit(7), null_space_error(7); //, tau_relative(7);
 
   null_space_error.setZero();
   null_space_error(0)=(right_arm_data.q_d_nullspace_(0) - q(0));
@@ -726,10 +744,10 @@ for (int i = 0; i < 7; ++i) {
 }
 
 
-  tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
-                                      right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); 
+  // tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
+  //                                     right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); 
   // Desired torque
-  tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit+tau_relative;
+  tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit - tau_gravity_internal + tau_gravity_real; //+tau_relative;
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRateRight(tau_d, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {
@@ -784,17 +802,17 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
 
   left_arm_data.nullspace_stiffness_ = config.panda_left_nullspace_stiffness;
 
-  left_arm_data.cartesian_stiffness_relative_.setIdentity();
-  left_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
-      << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
-  left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
-      << 0.0 * Eigen::Matrix3d::Identity();
+  // left_arm_data.cartesian_stiffness_relative_.setIdentity();
+  // left_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
+  //     << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
+  // left_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  //     << 0.0 * Eigen::Matrix3d::Identity();
 
-  left_arm_data.cartesian_damping_relative_.setIdentity();
-  left_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
-      << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  left_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
-          << 0.0 * Eigen::Matrix3d::Identity();
+  // left_arm_data.cartesian_damping_relative_.setIdentity();
+  // left_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
+  //     << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
+  // left_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
+  //         << 0.0 * Eigen::Matrix3d::Identity();
           
 
 
@@ -830,17 +848,17 @@ void BiManualCartesianImpedanceControl::complianceParamCallback(
   right_arm_data.nullspace_stiffness_ = config.panda_right_nullspace_stiffness;
 
 
-  right_arm_data.cartesian_stiffness_relative_.setIdentity();
-  right_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
-      << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
-  right_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
-      << 0.0 * Eigen::Matrix3d::Identity();
+  // right_arm_data.cartesian_stiffness_relative_.setIdentity();
+  // right_arm_data.cartesian_stiffness_relative_.topLeftCorner(3, 3)
+  //     << config.coupling_translational_stiffness * Eigen::Matrix3d::Identity();
+  // right_arm_data.cartesian_stiffness_relative_.bottomRightCorner(3, 3)
+  //     << 0.0 * Eigen::Matrix3d::Identity();
 
-  right_arm_data.cartesian_damping_relative_.setIdentity();
-  right_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
-      << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
-  right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
-          << 0.0 * Eigen::Matrix3d::Identity();
+  // right_arm_data.cartesian_damping_relative_.setIdentity();
+  // right_arm_data.cartesian_damping_relative_.topLeftCorner(3, 3)
+  //     << 2* sqrt(config.coupling_translational_stiffness) * Eigen::Matrix3d::Identity();
+  // right_arm_data.cartesian_damping_relative_.bottomRightCorner(3, 3)
+  //         << 0.0 * Eigen::Matrix3d::Identity();
 
 }
 
@@ -861,7 +879,7 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left(
     const geometry_msgs::PoseStampedConstPtr& msg) {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
   left_arm_data.position_d_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-  Eigen::Quaterniond last_orientation_d_(left_arm_data.orientation_d_);
+  // Eigen::Quaterniond last_orientation_d_(left_arm_data.orientation_d_);
   left_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
 }
@@ -870,21 +888,55 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
     const geometry_msgs::PoseStampedConstPtr& msg) {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   right_arm_data.position_d_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-  Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_);
+  // Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_);
   right_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
       msg->pose.orientation.z, msg->pose.orientation.w;
 }
 
-
-void BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative(
+void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global(
     const geometry_msgs::PoseStampedConstPtr& msg) {
-      //This function is receiving the distance from the distance respect the right arm and the left
   auto& right_arm_data = arms_data_.at(right_arm_id_);
-  auto&  left_arm_data = arms_data_.at(left_arm_id_);
-  left_arm_data.position_d_relative_  << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-  right_arm_data.position_d_relative_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-  left_arm_data.position_d_relative_=-left_arm_data.position_d_relative_;
+  Eigen::Affine3d transform_base_to_right_inverse = transform_base_to_right.inverse();
+  Eigen::Vector3d global_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+  Eigen::Vector3d local_position = transform_base_to_right_inverse * global_position;
+
+  Eigen::Quaterniond global_orientation(msg->pose.orientation.w, msg->pose.orientation.x,
+                      msg->pose.orientation.y, msg->pose.orientation.z);
+  Eigen::Quaterniond local_orientation(transform_base_to_right_inverse.linear() * global_orientation.toRotationMatrix());
+
+  right_arm_data.position_d_ << local_position[0], local_position[1], local_position[2];
+  right_arm_data.orientation_d_.coeffs() << local_orientation.x(), local_orientation.y(),
+      local_orientation.z(), local_orientation.w();
+  // Eigen::Quaterniond last_orientation_d_(right_arm_data.orientation_d_);
+  // right_arm_data.orientation_d_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
+  //     msg->pose.orientation.z, msg->pose.orientation.w;
 }
+
+void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left_global(
+    const geometry_msgs::PoseStampedConstPtr& msg) {
+  auto& left_arm_data = arms_data_.at(left_arm_id_);
+  Eigen::Affine3d transform_base_to_left_inverse = transform_base_to_left.inverse();
+  Eigen::Vector3d global_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+  Eigen::Vector3d local_position = transform_base_to_left_inverse * global_position;
+
+  Eigen::Quaterniond global_orientation(msg->pose.orientation.w, msg->pose.orientation.x,
+                      msg->pose.orientation.y, msg->pose.orientation.z);
+  Eigen::Quaterniond local_orientation(transform_base_to_left_inverse.linear() * global_orientation.toRotationMatrix());
+
+  left_arm_data.position_d_ << local_position[0], local_position[1], local_position[2];
+  left_arm_data.orientation_d_.coeffs() << local_orientation.x(), local_orientation.y(),
+      local_orientation.z(), local_orientation.w();
+    }
+
+// void BiManualCartesianImpedanceControl::equilibriumPoseCallback_relative(
+//     const geometry_msgs::PoseStampedConstPtr& msg) {
+//       //This function is receiving the distance from the distance respect the right arm and the left
+//   auto& right_arm_data = arms_data_.at(right_arm_id_);
+//   auto&  left_arm_data = arms_data_.at(left_arm_id_);
+//   left_arm_data.position_d_relative_  << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+//   right_arm_data.position_d_relative_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+//   left_arm_data.position_d_relative_=-left_arm_data.position_d_relative_;
+// }
 
 void BiManualCartesianImpedanceControl::equilibriumConfigurationCallback_right(const sensor_msgs::JointState::ConstPtr& joint) {
 

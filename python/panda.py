@@ -10,6 +10,7 @@ import rospy
 import math
 import numpy as np
 import time
+import quaternion 
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 import dynamic_reconfigure.client
@@ -52,7 +53,7 @@ class Panda:
 
         rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/" + str(self.name) + "_cartesian_pose",
                          PoseStamped, self.ee_pose_callback)
-        rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/" + str(self.name) + "_cartesian_pose__global_frame",
+        rospy.Subscriber("/panda_dual/bimanual_cartesian_impedance_controller/" + str(self.name) + "_cartesian_pose_global_frame",
                             PoseStamped, self.ee_pose_global_callback)
         rospy.Subscriber("panda_dual/" + str(self.name) + "_state_controller/joint_states", JointState,
                          self.joint_callback)
@@ -86,10 +87,10 @@ class Panda:
             self.end = True
 
     def ee_pose_callback(self, data):
-        self.cart_pose = data.pose
+        self.cart_pose = data
     
     def ee_pose_global_callback(self, data):
-        self.cart_pose_global = data.pose
+        self.cart_pose_global = data
     # joint angle subscriber
     def joint_callback(self, data):
         self.joint_pos = data.position[0:7]
@@ -120,12 +121,13 @@ class Panda:
         self.set_K.update_configuration({str(self.name) + "_rotational_stiffness_Z": k_r3})
 
     def Active(self):
-        self.set_stiffness(400.0, 400.0, 400.0, 30.0, 30.0, 30.0)
+        self.set_stiffness(1000.0, 1000.0, 1000.0, 30.0, 30.0, 30.0)
 
     def Passive(self):
         self.set_stiffness(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     def set_attractor(self, pose_st, global_frame=False):
+        # print("Pose: ", pose_st)
         if not global_frame:
             self.goal_pub.publish(pose_st)
         else:
@@ -136,39 +138,43 @@ class Panda:
         self.configuration_pub.publish(joint_des)
 
     def execute(self, global_frame=False, offset_z=0.0): 
-
+        r = rospy.Rate(self.control_freq)
         self.Active()
         self.go_to_start(global_frame=global_frame)
-        for i in range(self.recorded_traj.shape[1]):
+        for i in range(self.recorded_traj_pose.shape[1]):
             if not global_frame:
-                goal = self.recorded_traj_pose[i]
+                goal = self.recorded_traj_pose[0][i]
+                goal.pose.position.z = goal.pose.position.z + offset_z
+                self.goal_pub.publish(goal)
+
             else:
-                goal = self.recorded_traj_pose_global[i] 
-            goal.pose.position.z = goal.pose.position.z + offset_z
+                goal = self.recorded_traj_pose_global[0][i] 
+                goal.pose.position.z = goal.pose.position.z + offset_z
+                self.goal_pub_global.publish(goal)
+            
 
             
-            self.goal_pub.publish(goal)
-            self.r.sleep()
+            r.sleep()
         
     def go_to_start(self, global_frame=False):
         if not global_frame:
-            goal= self.recorded_traj_pose[0]
+            goal= self.recorded_traj_pose[0][0]
             self.go_to_3d(goal)
         else:
-            goal= self.recorded_traj_pose_global[0]
+            goal= self.recorded_traj_pose_global[0][0]
             self.go_to_3d(goal, global_frame=True)
 
     def go_to_3d(self, data, global_frame=False):
         control_freq = 50
         r = rospy.Rate(control_freq)
         if not global_frame:
-            start = [self.cart_pose.position.x, self.cart_pose.position.y, self.cart_pose.position.z]
-            start_ori = [self.cart_pose.orientation.w, self.cart_pose.orientation.x, self.cart_pose.orientation.y,
-                     self.cart_pose.orientation.z]
+            start = [self.cart_pose.pose.position.x, self.cart_pose.pose.position.y, self.cart_pose.pose.position.z]
+            start_ori = [self.cart_pose.pose.orientation.w, self.cart_pose.pose.orientation.x, self.cart_pose.pose.orientation.y,
+                     self.cart_pose.pose.orientation.z]
         else:
-            start = [self.cart_pose_global.position.x, self.cart_pose_global.position.y, self.cart_pose_global.position.z]
-            start_ori = [self.cart_pose_global.orientation.w, self.cart_pose_global.orientation.x, self.cart_pose_global.orientation.y,
-                     self.cart_pose_global.orientation.z]
+            start = [self.cart_pose_global.pose.position.x, self.cart_pose_global.pose.position.y, self.cart_pose_global.pose.position.z]
+            start_ori = [self.cart_pose_global.pose.orientation.w, self.cart_pose_global.pose.orientation.x, self.cart_pose_global.pose.orientation.y,
+                     self.cart_pose_global.pose.orientation.z]
         q_start = np.quaternion(start_ori[0], start_ori[1], start_ori[2], start_ori[3])
         # interpolate from start to goal with attractor distance of approx 1 mm
         goal_ = [data.pose.position.x, data.pose.position.y, data.pose.position.z]
@@ -176,6 +182,10 @@ class Panda:
         q_goal = np.quaternion(data.pose.orientation.w, data.pose.orientation.x, data.pose.orientation.y,
                                data.pose.orientation.z)
 
+        print("Moving to start position")
+        print("global_frame: ", global_frame)
+        print("Start position: ", start)
+        print("Goal position: ", goal_)
         squared_dist = np.sum(np.subtract(start, goal_) ** 2, axis=0)
         dist = np.sqrt(squared_dist)
         interp_dist = 0.001  # [m]
@@ -192,8 +202,15 @@ class Panda:
         pose_goal = self.pose_st_from_pos_ori(position, orientation)
 
         self.set_attractor(pose_goal, global_frame)
+        print("Moving to start position")
+
         self.Active()
         for i in range(step_num):
+            progress = (i + 1) / step_num
+            bar_length = 40
+            block = int(round(bar_length * progress))
+            bar = "#" * block + "-" * (bar_length - block)
+            print(f"\rProgress: [{bar}] {progress * 100:.2f}%", end="")
             position = [x[i], y[i], z[i]]
             quat = np.slerp_vectorized(q_start, q_goal, i / step_num)
             orientation = [quat.w, quat.x, quat.y, quat.z]
@@ -207,12 +224,12 @@ class Panda:
         pose_goal.header.stamp = rospy.Time.now()
         pose_goal.header.frame_id = "map"
         pose_goal.pose.position.x = pos[0]
-        pose_goal.pose.position.y = pos[0]
-        pose_goal.pose.position.z = pos[0]
-        pose_goal.pose.orientation.w = ori.w
-        pose_goal.pose.orientation.x = ori.x
-        pose_goal.pose.orientation.y = ori.y
-        pose_goal.pose.orientation.z = ori.z
+        pose_goal.pose.position.y = pos[1]
+        pose_goal.pose.position.z = pos[2]
+        pose_goal.pose.orientation.w = ori[0]
+        pose_goal.pose.orientation.x = ori[1]
+        pose_goal.pose.orientation.y = ori[2]
+        pose_goal.pose.orientation.z = ori[3]
         return pose_goal
     
 
@@ -244,16 +261,16 @@ class Panda:
 
             r.sleep()
             
-    def save(self, data='last'):
-        np.savez(str(pathlib.Path().resolve()) + '/data/' + str(data) + '.npz',
+    def save(self, name='last'):
+        np.savez(str(pathlib.Path().resolve()) + '/data/' + str(name) + '.npz',
                  recorded_traj_pose=self.recorded_traj_pose,
                  recorded_traj_pose_global=self.recorded_traj_pose_global,   
                  recorded_gripper=self.recorded_gripper,
                  recorded_stiffness_lin=self.recorded_stiffness_lin,
                  recorded_stiffness_ori=self.recorded_stiffness_ori)
 
-    def load(self, file='last'):
-        data = np.load(str(pathlib.Path().resolve()) + '/data/' + str(file) + '.npz')
+    def load(self, name='last'):
+        data = np.load(str(pathlib.Path().resolve()) + '/data/' + str(name) + '.npz', allow_pickle=True)
 
         self.recorded_traj_pose = data['recorded_traj_pose']
         self.recorded_traj_pose_global = data['recorded_traj_pose_global']

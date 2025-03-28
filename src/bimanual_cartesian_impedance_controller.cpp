@@ -159,12 +159,13 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   this->loadModel();
 
   // Read parameters for left arm
-  double left_orientation_p, left_orientation_r, left_orientation_y;
+  double left_orientation_w, left_orientation_x, left_orientation_y, left_orientation_z;
   double left_position_x, left_position_y, left_position_z;
 
-  if (!node_handle.getParam("/left/orientation/p", left_orientation_p) ||
-      !node_handle.getParam("/left/orientation/r", left_orientation_r) ||
-      !node_handle.getParam("/left/orientation/y", left_orientation_y) ||
+  if (!node_handle.getParam("/left/quaternion/w", left_orientation_w) ||
+      !node_handle.getParam("/left/quaternion/x", left_orientation_x) ||
+      !node_handle.getParam("/left/quaternion/y", left_orientation_y) ||
+      !node_handle.getParam("/left/quaternion/z", left_orientation_z) ||
       !node_handle.getParam("/left/position/x", left_position_x) ||
       !node_handle.getParam("/left/position/y", left_position_y) ||
       !node_handle.getParam("/left/position/z", left_position_z)) {
@@ -174,19 +175,18 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
 
   // Create transformation matrix for left arm
   R_left.setIdentity();
-  R_left = Eigen::AngleAxisd(left_orientation_y, Eigen::Vector3d::UnitZ()) *
-           Eigen::AngleAxisd(left_orientation_r, Eigen::Vector3d::UnitY()) *
-           Eigen::AngleAxisd(left_orientation_p, Eigen::Vector3d::UnitX());
+  R_left = Eigen::Quaterniond(left_orientation_w, left_orientation_x, left_orientation_y, left_orientation_z).toRotationMatrix();
 
   t_left.setZero();
   t_left << left_position_x, left_position_y, left_position_z;
   // Read parameters for right arm
-  double right_orientation_p, right_orientation_r, right_orientation_y;
+  double right_orientation_w, right_orientation_x, right_orientation_y, right_orientation_z;
   double right_position_x, right_position_y, right_position_z;
 
-  if (!node_handle.getParam("/right/orientation/p", right_orientation_p) ||
-      !node_handle.getParam("/right/orientation/r", right_orientation_r) ||
-      !node_handle.getParam("/right/orientation/y", right_orientation_y) ||
+  if (!node_handle.getParam("/right/quaternion/w", right_orientation_w) ||
+      !node_handle.getParam("/right/quaternion/x", right_orientation_x) ||
+      !node_handle.getParam("/right/quaternion/y", right_orientation_y) ||
+      !node_handle.getParam("/right/quaternion/z", right_orientation_z) ||
       !node_handle.getParam("/right/position/x", right_position_x) ||
       !node_handle.getParam("/right/position/y", right_position_y) ||
       !node_handle.getParam("/right/position/z", right_position_z)) {
@@ -196,10 +196,7 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
 
   // Create transformation matrix for right arm
   R_right.setIdentity();
-  R_right = Eigen::AngleAxisd(right_orientation_y, Eigen::Vector3d::UnitZ()) *
-            Eigen::AngleAxisd(right_orientation_r, Eigen::Vector3d::UnitY()) *
-            Eigen::AngleAxisd(right_orientation_p, Eigen::Vector3d::UnitX());
-
+  R_right = Eigen::Quaterniond(right_orientation_w, right_orientation_x, right_orientation_y, right_orientation_z).toRotationMatrix();
   t_right.setZero();
   t_right << right_position_x, right_position_y, right_position_z;
 
@@ -226,6 +223,9 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   transform_base_to_left.translation() = t_left;
   transform_base_to_right.linear() = R_right;
   transform_base_to_right.translation() = t_right;
+  transform_left_to_base = transform_base_to_left.inverse();
+  transform_right_to_base = transform_base_to_right.inverse();
+
   std::vector<std::string> left_joint_names;
   if (!node_handle.getParam("left/joint_names", left_joint_names) || left_joint_names.size() != 7) {
     ROS_ERROR(
@@ -387,6 +387,7 @@ void BiManualCartesianImpedanceControl::startingArmRight() {
   right_arm_data.position_d_ = initial_transform.translation();
   right_arm_data.orientation_d_ = Eigen::Quaterniond(initial_transform.linear());
 
+
   // set nullspace target configuration to initial q
   right_arm_data.q_d_nullspace_ = q_initial;
 }
@@ -424,13 +425,13 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   // Eigen::Vector3d position_right(transform_right.translation());
 
   // find the transformatio in base frame
-  Eigen::Affine3d transform_base_to_left = transform_base_to_left * transform;
+  Eigen::Affine3d transform_left_base_frame = transform_base_to_left * transform;
   // publish this transformation to the topic
   geometry_msgs::PoseStamped msg_left_global;
-  msg_left_global.pose.position.x=transform_base_to_left.translation()[0];
-  msg_left_global.pose.position.y=transform_base_to_left.translation()[1];
-  msg_left_global.pose.position.z=transform_base_to_left.translation()[2];
-  Eigen::Quaterniond orientation_base_to_left(transform_base_to_left.linear());
+  msg_left_global.pose.position.x=transform_left_base_frame.translation()[0];
+  msg_left_global.pose.position.y=transform_left_base_frame.translation()[1];
+  msg_left_global.pose.position.z=transform_left_base_frame.translation()[2];
+  Eigen::Quaterniond orientation_base_to_left(transform_left_base_frame.linear());
   msg_left_global.pose.orientation.x=orientation_base_to_left.x();
   msg_left_global.pose.orientation.y=orientation_base_to_left.y();
   msg_left_global.pose.orientation.z=orientation_base_to_left.z();
@@ -477,9 +478,11 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
 
   // std::array< double, 3 > gravity_global={{0., 0.,-9.81}};
   Eigen::Vector3d gravity_global(0., 0.,-9.81);
-  Eigen::Vector3d gravity_local = orientation_base_to_left.inverse() * gravity_global;
+    std::array<double, 3> gravity_global_array = {gravity_global[0], gravity_global[1], gravity_global[2]};
+  Eigen::Vector3d gravity_local = transform_left_to_base * gravity_global;
   std::array<double, 3> gravity_local_array = {gravity_local[0], gravity_local[1], gravity_local[2]};
-  std::array<double, 7> tau_gravity_internal_array = left_arm_data.model_handle_->getGravity();
+  // std::cout << "Gravity Local left: " << gravity_local << std::endl;
+  std::array<double, 7> tau_gravity_internal_array = left_arm_data.model_handle_->getGravity(gravity_global_array);
   std::array<double, 7> tau_gravity_real_array = left_arm_data.model_handle_->getGravity(gravity_local_array); //change the new gravity vector in lines 128 and 130. They should have opposite sign!
   Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_internal(tau_gravity_internal_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_real(tau_gravity_real_array.data());
@@ -565,9 +568,12 @@ for (int i = 0; i < 7; ++i) {
   // tau_relative << jacobian.transpose() * (-left_arm_data.cartesian_stiffness_relative_ * error_relative-
   //                                     left_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_right * dq_right));
   // Desired torque
-  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit - tau_gravity_internal + tau_gravity_real; 
+  tau_d_left << tau_task + tau_nullspace_left + coriolis+ tau_joint_limit; 
   // Saturate torque rate to avoid discontinuities
+  // tau_d_left << tau_d_left - tau_gravity_internal + tau_gravity_real; 
   tau_d_left << saturateTorqueRateLeft(tau_d_left, tau_J_d);
+  // ROS_INFO_STREAM("Gravity left Internal: " << tau_gravity_internal.transpose());
+  // ROS_INFO_STREAM("Gravity left Real: " << tau_gravity_real.transpose());
   for (size_t i = 0; i < 7; ++i) {
     left_arm_data.joint_handles_[i].setCommand(tau_d_left(i));
   }
@@ -627,13 +633,13 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   error_right[2]=std::max(-delta_lim, std::min(error_right[2], delta_lim));
 
   // find the transformatio in base frame
-  Eigen::Affine3d transform_base_to_right = transform_base_to_right * transform;
+  Eigen::Affine3d transform_right_base_frame = transform_base_to_right * transform;
   // publish this transformation to the topic
   geometry_msgs::PoseStamped msg_right_global;
-  msg_right_global.pose.position.x=transform_base_to_right.translation()[0];
-  msg_right_global.pose.position.y=transform_base_to_right.translation()[1];
-  msg_right_global.pose.position.z=transform_base_to_right.translation()[2];
-  Eigen::Quaterniond orientation_base_to_right(transform_base_to_right.linear());
+  msg_right_global.pose.position.x=transform_right_base_frame.translation()[0];
+  msg_right_global.pose.position.y=transform_right_base_frame.translation()[1];
+  msg_right_global.pose.position.z=transform_right_base_frame.translation()[2];
+  Eigen::Quaterniond orientation_base_to_right(transform_right_base_frame.linear());
   msg_right_global.pose.orientation.x=orientation_base_to_right.x();
   msg_right_global.pose.orientation.y=orientation_base_to_right.y();
   msg_right_global.pose.orientation.z=orientation_base_to_right.z();
@@ -675,9 +681,15 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   pub_force_torque_right.publish(force_torque_msg);
 
   Eigen::Vector3d gravity_global(0., 0.,-9.81);
-  Eigen::Vector3d gravity_local = orientation_base_to_right.inverse() * gravity_global;
+  std::array<double, 3> gravity_global_array = {gravity_global[0], gravity_global[1], gravity_global[2]};
+  Eigen::Vector3d gravity_local = transform_right_to_base * gravity_global;
+  // std::cout << "Rotation Base to Right: " << std::endl;
+  // std::cout << rotation_matrix_base_to_right << std::endl;
+  // std::cout << "Rotation Base to Right Transpose: " << std::endl;
+  // std::cout << rotation_matrix_base_to_right.transpose() << std::endl;
+  // std::cout << "Gravity Local right: " << gravity_local << std::endl;
   std::array<double, 3> gravity_local_array = {gravity_local[0], gravity_local[1], gravity_local[2]};
-  std::array<double, 7> tau_gravity_internal_array = right_arm_data.model_handle_->getGravity();
+  std::array<double, 7> tau_gravity_internal_array = right_arm_data.model_handle_->getGravity(gravity_global_array);
   std::array<double, 7> tau_gravity_real_array = right_arm_data.model_handle_->getGravity(gravity_local_array); //change the new gravity vector in lines 128 and 130. They should have opposite sign!
   Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_internal(tau_gravity_internal_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1> > tau_gravity_real(tau_gravity_real_array.data());
@@ -747,9 +759,14 @@ for (int i = 0; i < 7; ++i) {
   // tau_relative << jacobian.transpose() * (-right_arm_data.cartesian_stiffness_relative_ * error_relative-
   //                                     right_arm_data.cartesian_damping_relative_ * (jacobian * dq - jacobian_left * dq_left)); 
   // Desired torque
-  tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit - tau_gravity_internal + tau_gravity_real; //+tau_relative;
+  tau_d << tau_task + tau_nullspace_right + coriolis+tau_joint_limit; //+tau_relative;
   // Saturate torque rate to avoid discontinuities
+  // tau_d << tau_d - tau_gravity_internal + tau_gravity_real;
   tau_d << saturateTorqueRateRight(tau_d, tau_J_d);
+  // Print gravity_internal and gravity_real
+  // ROS_INFO_STREAM("Gravity right Internal: " << tau_gravity_internal.transpose());
+  // ROS_INFO_STREAM("Gravity right Real: " << tau_gravity_real.transpose());
+
   for (size_t i = 0; i < 7; ++i) {
     right_arm_data.joint_handles_[i].setCommand(tau_d(i));
   }
@@ -896,13 +913,15 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right(
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global(
     const geometry_msgs::PoseStampedConstPtr& msg) {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
-  Eigen::Affine3d transform_base_to_right_inverse = transform_base_to_right.inverse();
-  Eigen::Vector3d global_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-  Eigen::Vector3d local_position = transform_base_to_right_inverse * global_position;
+  Eigen::Affine3d transform_global;
+  transform_global.translation() << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  transform_global.linear() = Eigen::Quaterniond(msg->pose.orientation.w, msg->pose.orientation.x,
+                                          msg->pose.orientation.y, msg->pose.orientation.z)
+                           .toRotationMatrix();
+  Eigen::Affine3d transform_local = transform_right_to_base * transform_global;
 
-  Eigen::Quaterniond global_orientation(msg->pose.orientation.w, msg->pose.orientation.x,
-                      msg->pose.orientation.y, msg->pose.orientation.z);
-  Eigen::Quaterniond local_orientation(transform_base_to_right_inverse.linear() * global_orientation.toRotationMatrix());
+  Eigen::Vector3d local_position(transform_local.translation());
+  Eigen::Quaterniond local_orientation(transform_local.linear());
 
   right_arm_data.position_d_ << local_position[0], local_position[1], local_position[2];
   right_arm_data.orientation_d_.coeffs() << local_orientation.x(), local_orientation.y(),
@@ -915,13 +934,15 @@ void BiManualCartesianImpedanceControl::equilibriumPoseCallback_right_global(
 void BiManualCartesianImpedanceControl::equilibriumPoseCallback_left_global(
     const geometry_msgs::PoseStampedConstPtr& msg) {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
-  Eigen::Affine3d transform_base_to_left_inverse = transform_base_to_left.inverse();
-  Eigen::Vector3d global_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-  Eigen::Vector3d local_position = transform_base_to_left_inverse * global_position;
+  Eigen::Affine3d transform_global;
+  transform_global.translation() << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  transform_global.linear() = Eigen::Quaterniond(msg->pose.orientation.w, msg->pose.orientation.x,
+                                          msg->pose.orientation.y, msg->pose.orientation.z)
+                           .toRotationMatrix();
+  Eigen::Affine3d transform_local = transform_left_to_base * transform_global;
 
-  Eigen::Quaterniond global_orientation(msg->pose.orientation.w, msg->pose.orientation.x,
-                      msg->pose.orientation.y, msg->pose.orientation.z);
-  Eigen::Quaterniond local_orientation(transform_base_to_left_inverse.linear() * global_orientation.toRotationMatrix());
+  Eigen::Vector3d local_position(transform_local.translation());
+  Eigen::Quaterniond local_orientation(transform_local.linear());
 
   left_arm_data.position_d_ << local_position[0], local_position[1], local_position[2];
   left_arm_data.orientation_d_.coeffs() << local_orientation.x(), local_orientation.y(),

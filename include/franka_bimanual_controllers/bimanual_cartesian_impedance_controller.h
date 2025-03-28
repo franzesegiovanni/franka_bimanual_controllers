@@ -132,6 +132,8 @@ class BiManualCartesianImpedanceControl
     Eigen::Vector3d t_right;
     Eigen::Affine3d transform_base_to_left;
     Eigen::Affine3d transform_base_to_right;
+    Eigen::Affine3d transform_left_to_base;
+    Eigen::Affine3d transform_right_to_base;
     
 
   /**

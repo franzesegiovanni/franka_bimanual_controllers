@@ -123,7 +123,8 @@ class BiManualCartesianImpedanceControl
     pinocchio::Model model_pin_right_ ;   
     pinocchio::Data* data_pin_left_;
     pinocchio::Data* data_pin_right_;
-    std::string frame_name_;
+    std::string frame_name_left_;
+    std::string frame_name_right_;
     int frame_id_;
 
     Eigen::Matrix3d R_left;
@@ -232,9 +233,9 @@ class BiManualCartesianImpedanceControl
     void update(const ros::Time&, const ros::Duration& period) override;
     void loadModel();
     /// Define a virtual class for the forward kinematics of lef and right 
-    double* get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin);
+    double* get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin, const std::string& frame_name);
     // Define a virtual class for the jacobian of lef and right
-    std::array<double, 42> get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin);
+    std::array<double, 42> get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin, const std::string& frame_name);
 
 };
 

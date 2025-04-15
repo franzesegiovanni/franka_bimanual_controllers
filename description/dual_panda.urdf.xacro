@@ -3,8 +3,7 @@
   <xacro:arg name="arm_id_1" default="panda_right" />
   <xacro:arg name="arm_id_2" default="panda_left" />
 
-  <xacro:include filename="$(find franka_description)/robots/common/franka_arm.xacro"/>
-  <xacro:include filename="$(find franka_description)/robots/common/franka_hand.xacro"/>
+
 
   <!-- box shaped table as base for the 2 Pandas -->
   <link name="base">
@@ -25,6 +24,8 @@
     </collision>
   </link>
   
+
+  <!-- <xacro:include filename="$(find franka_description)/robots/common/franka_hand.xacro"/> -->
 <!-- Load the yaml file in franka_bimanual_controllers with relative_position in it -->
   <xacro:property name="relative_position" value="${xacro.load_yaml('$(find franka_bimanual_controllers)/config/relative_position.yaml')}"/>
 
@@ -43,19 +44,20 @@
   <xacro:property name="left_orientation_p" value="${relative_position['left']['orientation']['p']}"/>
   <xacro:property name="left_orientation_y" value="${relative_position['left']['orientation']['y']}"/>
 
+  <joint name="base_to_panda_left_link0" type="fixed">
+    <origin rpy="${left_orientation_r} ${left_orientation_p} ${left_orientation_y}" xyz="${left_position_x} ${left_position_y} ${left_position_z}" />
+    <parent link="base" />
+    <child link="panda_left_link0" />
+  </joint>
 
-  <!-- right arm with gripper -->
-  <xacro:franka_arm arm_id="$(arg arm_id_1)" connected_to="base"  xyz="${right_position_x} ${right_position_y} ${right_position_z}" rpy="${right_orientation_r} ${right_orientation_p} ${right_orientation_y}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
-  <xacro:franka_hand arm_id="$(arg arm_id_1)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_1)_link8" safety_distance="0.03"/>
-  <xacro:franka_arm arm_id="$(arg arm_id_2)" connected_to="base"  xyz="${left_position_x} ${left_position_y} ${left_position_z}" rpy="${left_orientation_r} ${left_orientation_p} ${left_orientation_y}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
-  <xacro:franka_hand arm_id="$(arg arm_id_2)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_2)_link8" safety_distance="0.03"/>
 
-    <!-- right arm with gripper -->
-  <!-- <xacro:franka_arm arm_id="$(arg arm_id_1)" connected_to="base"  xyz="0 -0.5 1" rpy="0 0 ${-pi/2}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
-  <xacro:franka_hand arm_id="$(arg arm_id_1)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_1)_link8" safety_distance="0.03"/> -->
+  <joint name="base_to_panda_right_link0" type="fixed">
+    <origin rpy="${right_orientation_r} ${right_orientation_p} ${right_orientation_y}" xyz="${right_position_x} ${right_position_y} ${right_position_z}" />
+    <parent link="base" />
+    <child link="panda_right_link0" />
+  </joint>
+  
+  <xacro:include filename="$(find franka_bimanual_controllers)/urdf/panda_calibrated_right.urdf" />
+  <xacro:include filename="$(find franka_bimanual_controllers)/urdf/panda_calibrated_left.urdf" />
 
-  <!-- left arm with gripper -->
-  <!-- <xacro:franka_arm arm_id="$(arg arm_id_2)" connected_to="base"  xyz="0 0.5 1" rpy="0 0 ${pi/2}" safety_distance="0.03" joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}"/>
-  <xacro:franka_hand arm_id="$(arg arm_id_2)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_2)_link8" safety_distance="0.03"/>
-   -->
 </robot>

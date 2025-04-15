@@ -10,7 +10,8 @@
   <arg name="robot_id_left" value="panda_left" />
   <arg name="robot_ips" value="{panda_right/robot_ip: $(arg robot_right_ip),panda_left/robot_ip: $(arg robot_left_ip)}" />
 
-  <param name="frame_name" value="panda_hand_tcp"/>
+  <param name="frame_name_right" value="panda_right_hand_tcp"/>
+  <param name="frame_name_left" value="panda_left_hand_tcp"/>  
   <rosparam file="$(find franka_description)/robots/$(arg arm_id)/joint_limits.yaml" command="load"/>
   <rosparam file="$(find franka_bimanual_controllers)/config/relative_position.yaml" command="load"/>
 

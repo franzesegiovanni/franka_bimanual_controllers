@@ -37,8 +37,10 @@ void BiManualCartesianImpedanceControl::loadModel() {
   urdf_path_right = package_path + "/urdf/panda_calibrated_right.urdf";
   std::cout << "URDF Path Left: " << urdf_path_left << std::endl;
   std::cout << "URDF Path Right: " << urdf_path_right << std::endl;
-  ros::param::get("frame_name", frame_name_);
-  std::cout << "Frame Name: " << frame_name_ << std::endl;
+  ros::param::get("frame_name_left", frame_name_left_);
+  ros::param::get("frame_name_right", frame_name_right_);
+  std::cout << "Frame Name Right: " << frame_name_right_ << std::endl;
+  std::cout << "Frame Name Left: " << frame_name_left_ << std::endl;
 
   std::cout << "Loading urdf into pinocchio as we are using the calibrated urdf model" << std::endl;
   pinocchio::urdf::buildModel(urdf_path_left, model_pin_left_);
@@ -47,16 +49,15 @@ void BiManualCartesianImpedanceControl::loadModel() {
   data_pin_right_ = new pinocchio::Data(model_pin_right_);
   std::cout << "Succesfully loaded the model and created the data pointer for both the robots." << std::endl;
 }
-
-double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
+double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin, const std::string& frame_name)
 {
-  // cout << "Getting the forward kinematics" << endl;s
+  // cout << "Getting the forward kinematics" << endl;
   Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
   Eigen::VectorXd q_vector = Eigen::VectorXd::Map(q.data(), q.size());
 
   pinocchio::forwardKinematics(model_pin, *data_pin, q_vector);
-  pinocchio::updateFramePlacement(model_pin, *data_pin, model_pin.getFrameId(frame_name_));
-  const auto& transformation = data_pin->oMf[model_pin.getFrameId(frame_name_)];  // Get the transformation of the frame
+  pinocchio::updateFramePlacement(model_pin, *data_pin, model_pin.getFrameId(frame_name));
+  const auto& transformation = data_pin->oMf[model_pin.getFrameId(frame_name)];  // Get the transformation of the frame
   
   // Allocate memory for the result
   double* result = new double[16];
@@ -65,7 +66,7 @@ double* BiManualCartesianImpedanceControl::get_fk(franka::RobotState robot_state
   return result; // Caller is responsible for deleting the allocated memory
 }
 
-std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin)
+std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::RobotState robot_state, pinocchio::Model& model_pin, pinocchio::Data* data_pin, const std::string& frame_name)
 {
   // cout << "Getting the jacobian" << endl;
   Eigen::Map<Eigen::Matrix<double, 9, 1>> q(robot_state.q.data());
@@ -75,7 +76,7 @@ std::array<double, 42> BiManualCartesianImpedanceControl::get_jacobian(franka::R
 
   pinocchio::forwardKinematics(model_pin, *data_pin, q_vector);
   pinocchio::computeJointJacobians(model_pin, *data_pin, q_vector);
-  pinocchio::getFrameJacobian(model_pin, *data_pin, model_pin.getFrameId(frame_name_), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
+  pinocchio::getFrameJacobian(model_pin, *data_pin, model_pin.getFrameId(frame_name), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
   std::array<double, 42> result;
   std::memcpy(result.data(), jacobian.data(), 42 * sizeof(double));
   // std::cout << "Jacobian: " << jacobian << std::endl;
@@ -348,12 +349,12 @@ void BiManualCartesianImpedanceControl::startingArmLeft() {
 
   franka::RobotState initial_state = left_arm_data.state_handle_->getRobotState();
   // get jacobian
-  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_left_,  data_pin_left_);
+  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_left_,  data_pin_left_, frame_name_left_);
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_initial(initial_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-  double* O_T_EE = this->get_fk(initial_state, model_pin_left_, data_pin_left_);
+  double* O_T_EE = this->get_fk(initial_state, model_pin_left_, data_pin_left_, frame_name_left_);
   Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(O_T_EE));
 
   // set target point to current state
@@ -373,12 +374,12 @@ void BiManualCartesianImpedanceControl::startingArmRight() {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   franka::RobotState initial_state = right_arm_data.state_handle_->getRobotState();
   // get jacobian
-  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_right_,data_pin_right_);
+  std::array<double, 42> jacobian_array = this->get_jacobian(initial_state, model_pin_right_,data_pin_right_, frame_name_right_);
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq_initial(initial_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-  double* O_T_EE = this->get_fk(initial_state,  model_pin_right_,  data_pin_right_);
+  double* O_T_EE = this->get_fk(initial_state,  model_pin_right_,  data_pin_right_, frame_name_right_);
   Eigen::Affine3d initial_transform(Eigen::Matrix4d::Map(O_T_EE));
 
   // set target point to current state
@@ -402,7 +403,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   std::array<double, 49> inertia_array = left_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = left_arm_data.model_handle_->getCoriolis();
 
-  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
+  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_, frame_name_left_);
   // std::array<double, 42> jacobian_array_right = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
 
   // convert to Eigen
@@ -412,7 +413,7 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state_left.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state_left.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d( robot_state_left.tau_J_d.data());
-  double* O_T_EE = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_);
+  double* O_T_EE = this->get_fk(robot_state_left, model_pin_left_,  data_pin_left_, frame_name_left_);
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(O_T_EE));
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
@@ -600,7 +601,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   // franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
   std::array<double, 49> inertia_array = right_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = right_arm_data.model_handle_->getCoriolis();
-  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_);
+  std::array<double, 42> jacobian_array = this->get_jacobian(robot_state_right, model_pin_right_,  data_pin_right_, frame_name_right_);
   // std::array<double, 42> jacobian_array_left = this->get_jacobian(robot_state_left, model_pin_left_,  data_pin_left_);
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
@@ -611,7 +612,7 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
 
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state_right.tau_J_d.data());
-  double* O_T_EE = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_);
+  double* O_T_EE = this->get_fk(robot_state_right, model_pin_right_,  data_pin_right_, frame_name_right_);
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(O_T_EE));
 
   Eigen::Vector3d position(transform.translation());

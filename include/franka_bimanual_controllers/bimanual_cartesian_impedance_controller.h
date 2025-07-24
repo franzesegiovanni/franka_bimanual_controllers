@@ -100,6 +100,13 @@ class BiManualCartesianImpedanceControl
   void update(const ros::Time&, const ros::Duration& period) override;
 
  private:
+  // Publisher for automatic error recovery
+  ros::Publisher pub_error_recovery_;
+
+  // Flags to track if arms are in an error state
+  bool left_arm_in_error_{false};
+  bool right_arm_in_error_{false};
+
   std::map<std::string, FrankaDataContainer>
       arms_data_;             ///< Holds all relevant data for both arms.
   std::string left_arm_id_;   ///< Name of the left arm, retrieved from the parameter server.

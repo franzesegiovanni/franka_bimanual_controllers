@@ -157,6 +157,7 @@ bool BiManualCartesianImpedanceControl::init(hardware_interface::RobotHW* robot_
   pub_force_torque_right= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_right_ext",1);
   pub_force_torque_left= node_handle.advertise<geometry_msgs::WrenchStamped>("/force_torque_left_ext",1);
 
+  pub_error_recovery_ = node_handle.advertise<franka_msgs::ErrorRecoveryActionGoal>("/panda_dual/error_recovery/goal", 1, true);
 
   dynamic_reconfigure_compliance_param_node_ =
       ros::NodeHandle("dynamic_reconfigure_compliance_param_node");
@@ -296,6 +297,21 @@ void BiManualCartesianImpedanceControl::updateArmLeft() {
   auto& left_arm_data = arms_data_.at(left_arm_id_);
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   franka::RobotState robot_state_left = left_arm_data.state_handle_->getRobotState();
+
+  if (robot_state_left.robot_mode == franka::RobotMode::kIdle) {
+    if (!left_arm_in_error_) {
+      ROS_WARN("Left arm entered Idle mode. Triggering automatic error recovery...");
+      franka_msgs::ErrorRecoveryActionGoal goal_msg;
+      pub_error_recovery_.publish(goal_msg);
+      left_arm_in_error_ = true;
+    }
+    // don't execute rest of controller logic while in error state
+    return;
+  } else {
+    // reset flag once arm is out of idle mode
+    left_arm_in_error_ = false;
+  }
+
   std::array<double, 49> inertia_array = left_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = left_arm_data.model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array =
@@ -464,6 +480,21 @@ void BiManualCartesianImpedanceControl::updateArmRight() {
   auto& right_arm_data = arms_data_.at(right_arm_id_);
   // get state variables
   franka::RobotState robot_state_right = right_arm_data.state_handle_->getRobotState();
+
+  if (robot_state_right.robot_mode == franka::RobotMode::kIdle) {
+    if (!right_arm_in_error_) {
+      ROS_WARN("Right arm entered Idle mode. Triggering automatic error recovery...");
+      franka_msgs::ErrorRecoveryActionGoal goal_msg;
+      pub_error_recovery_.publish(goal_msg);
+      right_arm_in_error_ = true;
+    }
+    // don't execute rest of controller logic while in error state
+    return;
+  } else {
+    // reset flag once arm is out of idle mode
+    right_arm_in_error_ = false;
+  }
+
   std::array<double, 49> inertia_array = right_arm_data.model_handle_->getMass();
   std::array<double, 7> coriolis_array = right_arm_data.model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array =

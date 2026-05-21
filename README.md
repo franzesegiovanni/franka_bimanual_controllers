@@ -70,3 +70,19 @@ If this code is useful in your research, please cite us:
 ```
 Franzese, G., de Souza Rosa, L., Verburg, T., Peternel, L. and Kober, J., 2023. Interactive Imitation Learning of Bimanual Movement Primitives. IEEE/ASME Transactions on Mechatronics.
 ```
+
+Bibtex:
+
+```bibtex
+@ARTICLE{franzese2024bimanualInteractiveImitationLearning,
+  author={Franzese, Giovanni and Rosa, Leandro de Souza and Verburg, Tim and Peternel, Luka and Kober, Jens},
+  journal={IEEE/ASME Transactions on Mechatronics}, 
+  title={Interactive Imitation Learning of Bimanual Movement Primitives}, 
+  year={2024},
+  volume={29},
+  number={5},
+  pages={4006-4018},
+  keywords={Trajectory;Task analysis;Robots;Robot kinematics;Education;Covariance matrices;Stability analysis;Bimanual manipulation;impedance control;interactive imitation learning (IIL);movement primitives (MPs)},
+  doi={10.1109/TMECH.2023.3295249}
+}
+```

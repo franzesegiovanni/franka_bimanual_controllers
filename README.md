@@ -73,7 +73,7 @@ Franzese, G., de Souza Rosa, L., Verburg, T., Peternel, L. and Kober, J., 2023. 
 
 Bibtex:
 
-```
+```bibtex
 @ARTICLE{franzese2024bimanualInteractiveImitationLearning,
   author={Franzese, Giovanni and Rosa, Leandro de Souza and Verburg, Tim and Peternel, Luka and Kober, Jens},
   journal={IEEE/ASME Transactions on Mechatronics}, 
